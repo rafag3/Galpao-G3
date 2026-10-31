@@ -102,6 +102,8 @@ Regras que sustentam a evolução para multiplayer:
 6. HUD final, menu e opções
    - ✅ Troca de lado: lado inicial no menu, intervalo após a rodada 4, desarme pelo jogador, HUD e avisos do ponto de vista do lado; dificuldade simétrica (com aliados mais fortes, a defesa vencia sozinha 15 de 16 rodadas)
    - ✅ Menu principal: painel com faixa de alerta, escolha de lado (TR/CT), nível dos bots, "Como jogar" (objetivo de cada lado, controles do aparelho, dicas) e Opções; na pausa, Continuar e Recomeçar partida. Fontes Saira e Saira Stencil One servidas pelo próprio site
+   - ✅ Radar no canto superior esquerdo: gira com o jogador, mostra aliados, sites, a bomba (TR sempre; CT depois de plantada) e só os inimigos que alguém do time está vendo agora
+   - ✅ Placar com TR e CT, "(você)" no seu time e quantos estão vivos de cada lado
    - ✅ Bots trocam tiro agachados (chance por nível: 25/45/60%, só com alvo a mais de 9 m) e agacham para plantar e desarmar
 7. Arte (em andamento)
    - ✅ Mapa: texturas procedurais geradas no carregamento (concreto, chapa ondulada, madeira, contêiner em 3 cores, pilar com faixa de alerta, chapa xadrez, pintura do site) com normal map; UV em escala de mundo; sombras do sol estáticas (desenhadas uma vez); claraboias no galpão e no B; céu em degradê

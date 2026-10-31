@@ -14,6 +14,7 @@ import { GameSim, type SimOptions } from '../sim/GameSim';
 import { clamp, lerp, type Vec3 } from '../sim/math';
 import { initPhysics } from '../sim/PhysicsWorld';
 import { DebugHud } from '../ui/DebugHud';
+import { Minimap } from '../ui/Minimap';
 import { Hud } from '../ui/Hud';
 import { type BombAction, RoundHud } from '../ui/RoundHud';
 import { inSite } from '../sim/RoundSystem';
@@ -35,6 +36,10 @@ export class Game {
   private debug?: DebugHud;
   private hud?: Hud;
   private roundHud?: RoundHud;
+  private minimap?: Minimap;
+  /** Inimigos avistados pelo time (radar); recalculado algumas vezes por segundo. */
+  private spotted = new Set<EntityId>();
+  private spotTimer = 0;
   private instrumentation?: SceneInstrumentation;
   private running = false;
   /** Visão local do jogador: atualizada a cada frame, enviada à sim a cada tick. */
@@ -82,6 +87,7 @@ export class Game {
     });
 
     this.hud = new Hud(this.uiRoot);
+    this.minimap = new Minimap(this.uiRoot, level);
     if (this.sim.rounds) {
       this.roundHud = new RoundHud(this.uiRoot, () => {
         this.sim.restartMatch();
@@ -189,6 +195,33 @@ export class Game {
     this.currEye = this.prevEye = this.sim.player.eyePosition();
     this.captureFeet();
     this.prevFeet = new Map(this.currFeet);
+  }
+
+  private updateMinimap(dt: number, feetOf: (id: EntityId) => Vec3): void {
+    if (!this.minimap) return;
+    const human = this.sim.human;
+    const team = human.team;
+    // Raycasts de avistamento: ~7 vezes por segundo bastam para o radar
+    this.spotTimer -= dt;
+    if (this.spotTimer <= 0) {
+      this.spotTimer = 0.15;
+      this.spotted = this.sim.spottedBy(team);
+    }
+    const others = this.sim.bots.map((b) => b.combatant).filter((c) => c.alive);
+    const me = feetOf(human.id);
+    const bomb = this.sim.rounds?.bomb ?? null;
+    const carrier = bomb?.status === 'carried' && bomb.carrier ? this.sim.find(bomb.carrier) : undefined;
+    this.minimap.update({
+      x: me.x,
+      z: me.z,
+      yaw: this.view.yaw,
+      team,
+      allies: others.filter((c) => c.team === team).map((c) => feetOf(c.id)),
+      enemies: others.filter((c) => c.team !== team && this.spotted.has(c.id)).map((c) => feetOf(c.id)),
+      bomb,
+      bombCarrier: carrier?.alive ? feetOf(carrier.id) : null,
+      time: this.sim.time,
+    });
   }
 
   private captureFeet(): void {
@@ -345,6 +378,7 @@ export class Game {
       this.roundHud?.update(dt, rounds.state, bomb, this.sim.combatants(), human, action);
       if (this.renderer.bomb.update(dt, bomb)) this.sound.beep();
     }
+    this.updateMinimap(dt, lerpFeet);
     this.debug?.update(dt, this.renderer.engine, p, this.instrumentation?.drawCallsCounter.current ?? 0);
   }
 }

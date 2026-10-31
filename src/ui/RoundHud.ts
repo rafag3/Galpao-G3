@@ -54,17 +54,28 @@ export class RoundHud {
 
   constructor(parent: HTMLElement, onRestart: () => void) {
     this.board = div('round-board', parent);
-    const atk = (this.atk = div('team atk', this.board));
-    this.atkScore = document.createElement('span');
-    this.atkScore.className = 'score';
-    this.atkAlive = div('alive', atk);
-    atk.prepend(this.atkScore);
+    // Cada lado: placar + sigla (com "você" no time do jogador) + vivos
+    const team = (cls: string, name: string) => {
+      const el = div(`team ${cls}`, this.board);
+      const score = document.createElement('span');
+      score.className = 'score';
+      const meta = div('meta', el);
+      div('side-name', meta).textContent = name;
+      const alive = div('alive', meta);
+      if (cls === 'atk') el.prepend(score);
+      else el.append(score);
+      return { el, score, alive };
+    };
+    const atk = team('atk', 'TR');
+    this.atk = atk.el;
+    this.atkScore = atk.score;
+    this.atkAlive = atk.alive;
     this.clock = div('clock', this.board);
-    const def = (this.def = div('team def', this.board));
-    this.defScore = document.createElement('span');
-    this.defScore.className = 'score';
-    this.defAlive = div('alive', def);
-    def.append(this.defScore);
+    this.board.append(this.clock);
+    const def = team('def', 'CT');
+    this.def = def.el;
+    this.defScore = def.score;
+    this.defAlive = def.alive;
 
     this.carrier = div('bomb-chip', parent);
     this.carrier.textContent = 'Você está com a bomba';
@@ -122,11 +133,10 @@ export class RoundHud {
     const mine = human.team;
     const canPlant = action === 'plant';
     // Placar e vivos: só reescreve o DOM quando algo muda
-    const alive = (t: 'attack' | 'defense') =>
-      all
-        .filter((c) => c.team === t)
-        .map((c) => (c.alive ? '●' : '○'))
-        .join('');
+    const alive = (t: 'attack' | 'defense') => {
+      const n = all.filter((c) => c.team === t && c.alive).length;
+      return n === 0 ? 'nenhum vivo' : n === 1 ? '1 vivo' : `${n} vivos`;
+    };
     const key = `${state.score.attack}|${state.score.defense}|${alive('attack')}|${alive('defense')}|${mine}`;
     if (key !== this.lastKey) {
       this.atk.classList.toggle('mine', mine === 'attack');
@@ -138,7 +148,8 @@ export class RoundHud {
       this.lastKey = key;
     }
 
-    const planted = bomb.status === 'planted';
+    // Rodada encerrada (por eliminação, por exemplo): a bomba que sobrou não conta mais
+    const planted = bomb.status === 'planted' && state.phase === 'live';
     this.clock.classList.toggle('bomb', planted);
     if (state.phase === 'freeze') this.clock.textContent = `Preparação ${Math.ceil(state.timeLeft)}`;
     else if (planted) this.clock.textContent = `Bomba ${mmss(bomb.timeLeft)}`;
@@ -165,7 +176,9 @@ export class RoundHud {
     const attacking = mine === 'attack';
     let alert = '';
     let danger = false;
-    if (state.phase === 'freeze' && (state.round === 1 || state.round === ROUND.halftimeAfterRound + 1))
+    if (!live) {
+      // Fim de rodada: só o banner fala
+    } else if (state.phase === 'freeze' && (state.round === 1 || state.round === ROUND.halftimeAfterRound + 1))
       alert = attacking ? 'Plante a bomba no A ou no B' : 'Defenda os sites A e B';
     else if (planted && bomb.defuser && bomb.defuser !== human.id) {
       alert = attacking ? 'Os CTs estão desarmando!' : 'Um aliado está desarmando';

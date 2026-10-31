@@ -130,6 +130,25 @@ describe('bots', () => {
   });
 });
 
+describe('radar', () => {
+  it('mostra só inimigos que o time está vendo agora', () => {
+    const sim = simWithBotsPosted();
+    // No spawn do ataque, paredes escondem todos
+    expect(sim.spottedBy('attack').size).toBe(0);
+    // No galpão, olhando para o norte: o bot do mid (36,47) está à vista
+    sim.human.controller.teleport(plan(33, 34), 0);
+    run(sim, 1 / SIM_HZ, { yaw: 0 });
+    const mid = sim.bots.find((b) => Math.hypot(b.combatant.controller.state.feet.x - plan(36, 47).x, b.combatant.controller.state.feet.z - plan(36, 47).z) < 1.5)!;
+    expect(sim.spottedBy('attack').has(mid.combatant.id)).toBe(true);
+    // De costas para ele: fora do campo de visão
+    run(sim, 1 / SIM_HZ, { yaw: Math.PI });
+    expect(sim.spottedBy('attack').has(mid.combatant.id)).toBe(false);
+    // O time do bot, que está mirando no jogador, o vê
+    run(sim, 1);
+    expect(sim.spottedBy('defense').has('player')).toBe(true);
+  });
+});
+
 describe('agachar', () => {
   const crouchers = (sim: GameSim) => sim.bots.filter((b) => b.combatant.controller.state.crouching).length;
 

@@ -18,8 +18,9 @@ import { BOT, type BotSkill, SKILLS } from '../config';
 import type { EntityId } from '../events';
 import type { HitRegistry } from '../HitRegistry';
 import { clamp, lerp, type Vec3 } from '../math';
+import { sightPoint } from '../vision';
 import { NavGrid, type Point2 } from '../nav/NavGrid';
-import { PhysicsWorld, RAPIER } from '../PhysicsWorld';
+import type { PhysicsWorld } from '../PhysicsWorld';
 import type { Rng } from '../rng';
 
 export type BotState = 'toGoal' | 'hold' | 'chase' | 'combat';
@@ -112,6 +113,11 @@ export class BotBrain {
   ) {
     this.visionTimer = index * 0.05; // escalona os raycasts entre bots
     this.sweepPhase = index * 2.1;
+  }
+
+  /** Inimigo que o bot está vendo agora (para o radar do time). */
+  get seenTarget(): EntityId | null {
+    return this.visible && this.target?.alive ? this.target.id : null;
   }
 
   /** Troca o objetivo; ignora mudanças pequenas para não ficar recalculando. */
@@ -219,15 +225,7 @@ export class BotBrain {
     const off = Math.abs(wrap(Math.atan2(dx, dz) - this.yaw));
     if (off > BOT.halfFov && d > BOT.proximitySense) return null;
 
-    for (const y of [enemy.controller.chestY(), enemy.controller.headLineY() + 0.12]) {
-      const p = { x: ef.x, y, z: ef.z };
-      const v = { x: p.x - eye.x, y: p.y - eye.y, z: p.z - eye.z };
-      const len = Math.hypot(v.x, v.y, v.z);
-      const dir = { x: v.x / len, y: v.y / len, z: v.z / len };
-      const hit = ctx.physics.world.castRay(new RAPIER.Ray(eye, dir), len + 0.5, true, undefined, undefined, me.collider);
-      if (hit && ctx.hits.ownerOf(hit.collider) === enemy.id) return p;
-    }
-    return null;
+    return sightPoint(ctx.physics, ctx.hits, ctx.self, enemy);
   }
 
   // ------------------------------------------------------------------ decisão

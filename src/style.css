@@ -268,9 +268,9 @@ body.can-use .btn-use { display: block; }
 /* Vida e placar pessoal */
 .hud-health {
   position: absolute;
-  left: calc(16px + var(--safe-l));
-  top: calc(10px + var(--safe-t));
-  min-width: 150px;
+  left: calc(12px + var(--safe-l));
+  top: calc(144px + var(--safe-t));
+  width: 128px;
   padding: 6px 12px 8px;
   border-radius: 8px;
   background: var(--panel);
@@ -298,7 +298,8 @@ body.can-use .btn-use { display: block; }
   position: absolute;
   inset: 0;
   display: none;
-  place-items: center;
+  place-items: start center;
+  padding-top: 52vh;
   background: rgba(60, 0, 0, 0.35);
   font-size: 22px;
   font-weight: 700;
@@ -306,6 +307,7 @@ body.can-use .btn-use { display: block; }
   z-index: 8;
 }
 .death-screen.show { display: grid; }
+body.is-touch .death-screen { font-size: 16px; }
 
 /* Placar da rodada */
 .round-board {
@@ -330,7 +332,6 @@ body.can-use .btn-use { display: block; }
 .round-board .team.atk { border-radius: 8px 0 0 8px; border-bottom: 3px solid var(--orange); }
 .round-board .team.def { border-radius: 0 8px 8px 0; border-bottom: 3px solid var(--blue); }
 .round-board .score { font-size: 22px; font-weight: 800; }
-.round-board .alive { font-size: 11px; letter-spacing: 1px; color: var(--muted); }
 .round-board .clock { min-width: 92px; justify-content: center; font-size: 16px; font-weight: 700; }
 .round-board .clock.bomb { color: #ff4d4d; }
 
@@ -372,14 +373,32 @@ body.can-use .btn-use { display: block; }
 .overlay.match-over h1 { font-size: 44px; }
 
 /* Menu aberto: esconde o HUD do jogo por trás dele */
-body.menu-open :is(.round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
+body.menu-open :is(.minimap, .round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
 .crosshair.dead { visibility: hidden; }
 
 /* Placar: o time do jogador ganha destaque */
 .round-board .team.mine { background: rgba(255, 255, 255, 0.14); }
-.round-board .team.mine .score::after { content: ' Você'; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); vertical-align: middle; }
-.round-board .team.def.mine .score::after { content: none; }
-.round-board .team.def.mine .score::before { content: 'Você '; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); vertical-align: middle; }
+.round-board .meta { display: grid; line-height: 1.1; }
+.round-board .def .meta { text-align: right; }
+.round-board .side-name { font-size: 13px; font-weight: 800; }
+.round-board .atk .side-name { color: var(--orange); }
+.round-board .def .side-name { color: var(--blue); }
+.round-board .mine .side-name::after { content: ' (você)'; font-weight: 600; color: var(--muted); }
+.round-board .alive { font-size: 12px; color: var(--text); white-space: nowrap; }
+
+/* Radar: canto superior esquerdo; vida logo abaixo */
+.minimap {
+  position: absolute;
+  left: calc(12px + var(--safe-l));
+  top: calc(8px + var(--safe-t));
+  width: 128px;
+  height: 128px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  pointer-events: none !important;
+  z-index: 5;
+}
+@media (max-height: 360px) { .minimap { width: 112px; height: 112px; } .hud-health { top: calc(126px + var(--safe-t)); width: 112px; } }
 
 /* ------------------------------------------------------------------ menu
    Painel à esquerda com faixa de alerta (a mesma dos pilares do mapa);

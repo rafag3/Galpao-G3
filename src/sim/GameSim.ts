@@ -21,6 +21,7 @@ import { PlayerController } from './PlayerController';
 import { Rng } from './rng';
 import { RoundSystem } from './RoundSystem';
 import { TargetSystem } from './TargetSystem';
+import { sightPoint } from './vision';
 import { WeaponController } from './WeaponController';
 import { RIFLE } from './weapons';
 
@@ -47,6 +48,8 @@ export interface SimOptions {
 }
 
 const emptyMemory = (): TeamMemory => ({ lastKnown: null, at: -99, spotter: null, responder: null });
+/** Avistamento pelo humano: metade do campo de visão horizontal da câmera na horizontal e alcance. */
+const SPOT = { halfFov: 0.95, maxDistance: 60 };
 const other = (t: Team): Team => (t === 'attack' ? 'defense' : 'attack');
 const spawnYaw = (level: LevelData, t: Team) => (t === 'attack' ? level.spawnYaw : Math.PI);
 
@@ -264,6 +267,35 @@ export class GameSim {
       });
     }
     this.teams = { attack: emptyMemory(), defense: emptyMemory() };
+  }
+
+  /**
+   * Inimigos que alguém do time `team` está vendo agora (radar). Bots contam
+   * o alvo que estão combatendo; o humano conta quem está no campo de visão
+   * da câmera e sem parede no caminho. Só lê o estado: não altera a partida.
+   */
+  spottedBy(team: Team): Set<EntityId> {
+    const out = new Set<EntityId>();
+    for (const b of this.bots) {
+      const seen = b.combatant.alive && b.combatant.team === team ? b.brain.seenTarget : null;
+      if (seen) out.add(seen);
+    }
+    const h = this.human;
+    if (h.alive && h.team === team) {
+      const eye = h.controller.eyePosition();
+      for (const e of this.combatants()) {
+        if (!e.alive || e.team === team || out.has(e.id)) continue;
+        const f = e.controller.state.feet;
+        const dx = f.x - eye.x;
+        const dz = f.z - eye.z;
+        if (Math.hypot(dx, dz) > SPOT.maxDistance) continue;
+        let off = Math.atan2(dx, dz) - h.controller.state.yaw;
+        off = Math.atan2(Math.sin(off), Math.cos(off));
+        if (Math.abs(off) > SPOT.halfFov) continue;
+        if (sightPoint(this.physics, this.hits, h, e)) out.add(e.id);
+      }
+    }
+    return out;
   }
 
   /** Dificuldade de todos os bots (ver `SimOptions.difficulty`). */
