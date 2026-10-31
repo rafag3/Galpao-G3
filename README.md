@@ -2,15 +2,15 @@
 
 FPS tático 3D original para navegador, com foco em celular (touch, horizontal) e suporte a PC (teclado e mouse).
 
-**Estado atual:** **modo bomba 3 contra 3** no mapa Galpão. Você e 2 aliados bots contra 3 bots; escolha começar no ataque ou na defesa, e os times trocam de lado no intervalo. Primeiro a 5 rodadas vence.
+**Estado atual:** **modo bomba 3 contra 3** no mapa Galpão. Você e 2 aliados bots contra 3 bots; escolha começar como **TR** (ataque, planta a bomba) ou **CT** (defesa, desarma), e os times trocam de lado no intervalo. Primeiro a 5 rodadas vence.
 
 | Regra | Valor |
 |---|---|
 | Preparação / rodada | 3 s / 1:30 |
 | Plantar / desarmar | 3 s / 5 s segurando a ação, quase parado |
 | Bomba | 35 s; letal até 8 m |
-| Ataque vence | elimina a defesa ou a bomba explode |
-| Defesa vence | elimina o ataque antes do plantio, tempo esgota ou desarma |
+| TR (ataque) vence | elimina os CTs ou a bomba explode |
+| CT (defesa) vence | elimina os TRs antes do plantio, tempo esgota ou desarma |
 | Morte | volta só na próxima rodada |
 | Troca de lado | depois da rodada 4 (o placar acompanha cada time) |
 | Dificuldade | vale para todos os bots, aliados e adversários |
@@ -101,7 +101,8 @@ Regras que sustentam a evolução para multiplayer:
 5. ✅ Rodadas e bomba: plantar/desarmar/explodir, queda e coleta da bomba, aliados bots, desarme e retomada pela defesa, placar, fim de partida
 6. HUD final, menu e opções
    - ✅ Troca de lado: lado inicial no menu, intervalo após a rodada 4, desarme pelo jogador, HUD e avisos do ponto de vista do lado; dificuldade simétrica (com aliados mais fortes, a defesa vencia sozinha 15 de 16 rodadas)
-   - Menu principal e tela "como jogar"
+   - ✅ Menu principal: painel com faixa de alerta, escolha de lado (TR/CT), nível dos bots, "Como jogar" (objetivo de cada lado, controles do aparelho, dicas) e Opções; na pausa, Continuar e Recomeçar partida. Fontes Saira e Saira Stencil One servidas pelo próprio site
+   - ✅ Bots trocam tiro agachados (chance por nível: 25/45/60%, só com alvo a mais de 9 m) e agacham para plantar e desarmar
 7. Arte (em andamento)
    - ✅ Mapa: texturas procedurais geradas no carregamento (concreto, chapa ondulada, madeira, contêiner em 3 cores, pilar com faixa de alerta, chapa xadrez, pintura do site) com normal map; UV em escala de mundo; sombras do sol estáticas (desenhadas uma vez); claraboias no galpão e no B; céu em degradê
    - ✅ Arma em primeira pessoa: fuzil original em partes (culatra, guarda-mão, trilho, mira de ponto vermelho, cano, quebra-chamas, carregador, coronha), mãos com luva e manga camuflada; câmera própria com FOV de 47° (proporção natural sem estreitar a visão); recarga em etapas (inclina, solta o pente, mão busca outro, encaixa); cápsulas ejetadas; clarão em estrela aditivo

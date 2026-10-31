@@ -79,6 +79,8 @@ export const BOT = {
   teamInfoSeconds: 6,
   repathSeconds: 1,
   arriveRadius: 0.7,
+  /** Só agacha para trocar tiro com alvo a mais disto (perto, agachar é só ficar lento). */
+  crouchMinDistance: 9,
 };
 
 /** Regras de rodada (CS simplificado, tempos encurtados para celular). */
@@ -113,6 +115,11 @@ export interface BotSkill {
   aimSettleSeconds: number;
   burstSeconds: readonly [number, number];
   pauseSeconds: readonly [number, number];
+  /**
+   * Chance de trocar tiro agachado (por avistamento, alvo distante): mira
+   * mais precisa e corpo menor, em troca de ficar parado.
+   */
+  crouchChance: number;
 }
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -131,6 +138,7 @@ export const SKILLS: Record<Difficulty, BotSkill> = {
     aimSettleSeconds: 3,
     burstSeconds: [0.15, 0.3],
     pauseSeconds: [0.5, 0.9],
+    crouchChance: 0.25,
   },
   normal: {
     reactionSeconds: BOT.reactionSeconds,
@@ -141,6 +149,7 @@ export const SKILLS: Record<Difficulty, BotSkill> = {
     aimSettleSeconds: BOT.aimSettleSeconds,
     burstSeconds: BOT.burstSeconds,
     pauseSeconds: BOT.pauseSeconds,
+    crouchChance: 0.45,
   },
   hard: {
     reactionSeconds: 0.38,
@@ -151,5 +160,6 @@ export const SKILLS: Record<Difficulty, BotSkill> = {
     aimSettleSeconds: 1.2,
     burstSeconds: [0.25, 0.5],
     pauseSeconds: [0.25, 0.5],
+    crouchChance: 0.6,
   },
 };

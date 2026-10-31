@@ -13,7 +13,8 @@ const REASON: Record<RoundEndReason, string> = {
   time: 'tempo esgotado',
 };
 
-const SIDE: Record<Team, string> = { attack: 'Ataque', defense: 'Defesa' };
+/** Nomes na tela: TR (ataque) e CT (defesa). */
+const SIDE: Record<Team, string> = { attack: 'TR', defense: 'CT' };
 
 /** O que o jogador pode fazer agora com a bomba. */
 export type BombAction = 'plant' | 'defuse' | null;
@@ -95,7 +96,7 @@ export class RoundHud {
   /** Intervalo: avisa o novo lado do jogador. */
   showHalftime(mine: Team): void {
     this.banner.className = 'round-banner show';
-    this.banner.textContent = `Troca de lado · agora você está na ${SIDE[mine].toLowerCase()}`;
+    this.banner.textContent = `Troca de lado · agora você é ${SIDE[mine]}`;
     this.bannerTimer = ROUND.freezeSeconds + 0.5;
   }
 
@@ -104,6 +105,13 @@ export class RoundHud {
     this.matchScreen.querySelector('h1')!.textContent = winner === mine ? 'Vitória' : 'Derrota';
     this.matchScreen.querySelector('.phase')!.textContent = `Seu time ${state.score[mine]} × ${state.score[enemy]} Adversários`;
     this.matchScreen.classList.remove('hidden');
+  }
+
+  /** Partida recomeçada pelo menu: some com o fim de partida e o banner. */
+  reset(): void {
+    this.matchScreen.classList.add('hidden');
+    this.banner.classList.remove('show');
+    this.bannerTimer = 0;
   }
 
   explosion(): void {
@@ -160,12 +168,12 @@ export class RoundHud {
     if (state.phase === 'freeze' && (state.round === 1 || state.round === ROUND.halftimeAfterRound + 1))
       alert = attacking ? 'Plante a bomba no A ou no B' : 'Defenda os sites A e B';
     else if (planted && bomb.defuser && bomb.defuser !== human.id) {
-      alert = attacking ? 'A defesa está desarmando!' : 'Um aliado está desarmando';
+      alert = attacking ? 'Os CTs estão desarmando!' : 'Um aliado está desarmando';
       danger = attacking;
     } else if (planted && !attacking && !bomb.defuser) {
       alert = `Bomba plantada no ${bomb.site}: desarme!`;
       danger = true;
-    } else if (bomb.status === 'dropped') alert = attacking ? 'Bomba caída: um aliado vai buscar' : 'O ataque deixou a bomba cair';
+    } else if (bomb.status === 'dropped') alert = attacking ? 'Bomba caída: um aliado vai buscar' : 'Os TRs deixaram a bomba cair';
     this.alert.textContent = alert;
     this.alert.classList.toggle('show', !!alert);
     this.alert.classList.toggle('danger', danger);

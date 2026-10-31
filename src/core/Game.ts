@@ -8,7 +8,7 @@ import { TouchInput } from '../input/TouchInput';
 import type { LevelData } from '../level/LevelData';
 import { GameRenderer } from '../render/GameRenderer';
 import { LOOK, MOVE, ROUND, SIM_DT } from '../sim/config';
-import { viewOf } from '../sim/Combatant';
+import { type Team, viewOf } from '../sim/Combatant';
 import type { EntityId, SimEvent } from '../sim/events';
 import { GameSim, type SimOptions } from '../sim/GameSim';
 import { clamp, lerp, type Vec3 } from '../sim/math';
@@ -101,13 +101,8 @@ export class Game {
       },
       onVolumeChange: (v) => this.sound.setVolume(v),
       onDifficultyChange: (d) => this.sim.setDifficulty(d),
-      onSideChange: (side) => {
-        this.sim.restartMatch(side);
-        this.sim.drainEvents();
-        this.hits = this.kills = 0;
-        this.input.clearLatched();
-        this.resetView();
-      },
+      onSideChange: (side) => this.restart(side),
+      onRestart: () => this.restart(),
     });
 
     const pause = () => {
@@ -176,6 +171,16 @@ export class Game {
         return game.running;
       },
     };
+  }
+
+  /** Recomeça a partida pelo menu (troca de lado ou "Recomeçar partida"). */
+  private restart(side?: Team): void {
+    this.sim.restartMatch(side);
+    this.sim.drainEvents();
+    this.hits = this.kills = 0;
+    this.input.clearLatched();
+    this.roundHud?.reset();
+    this.resetView();
   }
 
   /** Câmera na posição e direção atuais do jogador (início e troca de lado). */

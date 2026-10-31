@@ -199,7 +199,7 @@ export class TouchInput implements InputSource {
     return p;
   }
 
-  /** Rótulo do botão de ação: "Plantar" no ataque, "Desarmar" na defesa. */
+  /** Rótulo do botão de ação: "Plantar" como TR, "Desarmar" como CT. */
   setUseLabel(label: string): void {
     if (this.useBtn.textContent !== label) this.useBtn.textContent = label;
   }

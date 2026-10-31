@@ -1,7 +1,13 @@
-// Tela inicial e de pausa, com as opções de sensibilidade e volume.
-// O botão "Jogar" é o gesto do usuário que os navegadores exigem para tela
-// cheia, trava de orientação, pointer lock e áudio.
+// Menu principal e de pausa: lado inicial, nível dos bots, Jogar, "Como
+// jogar" e Opções (gráficos, sensibilidade, volume), num painel à esquerda
+// que deixa a cena visível. O botão "Jogar" é o gesto do usuário que os
+// navegadores exigem para tela cheia, trava de orientação, pointer lock e
+// áudio.
 
+import '@fontsource/saira/latin-400.css';
+import '@fontsource/saira/latin-600.css';
+import '@fontsource/saira/latin-700.css';
+import '@fontsource/saira-stencil-one/latin-400.css';
 import { saveSettings, settings } from '../core/Settings';
 import type { Team } from '../sim/Combatant';
 import { type Difficulty, ROUND } from '../sim/config';
@@ -12,6 +18,8 @@ const LEVELS: [Difficulty, string][] = [
   ['hard', 'Difícil'],
 ];
 
+type View = 'main' | 'howto' | 'options';
+
 export interface StartOptions {
   isTouch: boolean;
   onStart: () => void;
@@ -19,6 +27,30 @@ export interface StartOptions {
   onDifficultyChange: (d: Difficulty) => void;
   /** Lado inicial mudou: recomeça a partida. */
   onSideChange: (side: Team) => void;
+  /** "Recomeçar partida" no menu de pausa. */
+  onRestart: () => void;
+}
+
+const radio = (attr: string, value: string, checked: boolean, inner: string, cls = '') =>
+  `<button type="button" role="radio" class="${cls}" data-${attr}="${value}" aria-checked="${checked}">${inner}</button>`;
+
+function controlsHtml(isTouch: boolean): string {
+  const rows: [string, string][] = isTouch
+    ? [
+        ['Andar', 'Polegar esquerdo em qualquer ponto da metade esquerda; no limite do círculo você corre'],
+        ['Mirar', 'Arraste na metade direita'],
+        ['Atirar', 'Segure Atirar; arrastar o dedo no botão também mira'],
+        ['Plantar e desarmar', 'Segure o botão que aparece no site ou perto da bomba'],
+        ['Agachar', 'Toque para alternar'],
+      ]
+    : [
+        ['Andar e correr', 'WASD, Shift para correr'],
+        ['Mirar e atirar', 'Mouse; clique atira, segurar é automático'],
+        ['Plantar e desarmar', 'Segure E'],
+        ['Agachar, pular, recarregar', 'C, Espaço, R'],
+        ['Pausar', 'Esc'],
+      ];
+  return rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
 
 export class StartOverlay {
@@ -26,46 +58,95 @@ export class StartOverlay {
 
   constructor(parent: HTMLElement, private readonly opts: StartOptions) {
     const sensKey = opts.isTouch ? 'touchSensitivity' : 'mouseSensitivity';
+    const mins = Math.floor(ROUND.roundSeconds / 60);
+    const secs = String(ROUND.roundSeconds % 60).padStart(2, '0');
     this.root = document.createElement('div');
     this.root.className = 'overlay start';
     this.root.innerHTML = `
-      <div class="start-card">
-        <h1>Galpão G3</h1>
-        <p class="phase">Modo bomba · 3 contra 3 · troca de lado na rodada ${ROUND.halftimeAfterRound + 1}</p>
-        <button type="button" class="start-btn">Jogar</button>
-        <div class="difficulty side" role="radiogroup" aria-label="Lado inicial">
-          <button type="button" role="radio" data-s="attack" aria-checked="${settings.side === 'attack'}">Começar no ataque</button>
-          <button type="button" role="radio" data-s="defense" aria-checked="${settings.side === 'defense'}">Começar na defesa</button>
-        </div>
-        <div class="difficulty" role="radiogroup" aria-label="Dificuldade">
-          ${LEVELS.map(([id, label]) => `<button type="button" role="radio" data-d="${id}" aria-checked="${settings.difficulty === id}">${label}</button>`).join('')}
-        </div>
-        <div class="difficulty graphics" role="radiogroup" aria-label="Gráficos">
-          <button type="button" role="radio" data-g="high" aria-checked="${settings.graphics === 'high'}">Gráficos altos</button>
-          <button type="button" role="radio" data-g="low" aria-checked="${settings.graphics === 'low'}">Leve</button>
-        </div>
-        <div class="settings">
-          <label>Sensibilidade ${opts.isTouch ? 'do toque' : 'do mouse'}
-            <input type="range" name="sens" min="0.3" max="3" step="0.05" value="${settings[sensKey]}">
-            <output>${settings[sensKey].toFixed(2)}</output>
-          </label>
-          <label>Volume
-            <input type="range" name="vol" min="0" max="1" step="0.05" value="${settings.volume}">
-            <output>${Math.round(settings.volume * 100)}%</output>
-          </label>
-        </div>
-        <p class="hint">${
-          opts.isTouch
-            ? 'Polegar esquerdo move (no limite corre). Arraste à direita para mirar. O botão Atirar também mira enquanto pressionado.'
-            : 'WASD move · Shift corre · Espaço pula · C agacha · Clique atira · R recarrega · E (segurar) planta ou desarma · Esc pausa'
-        }</p>
+      <div class="menu-panel" data-view="main">
+        <section class="menu-view view-main">
+          <h1 class="menu-title">Galpão G3</h1>
+          <p class="menu-sub">Modo bomba, 3 contra 3. Vence quem ganhar ${ROUND.winsToMatch} rodadas.</p>
+          <div class="side" role="radiogroup" aria-label="Lado inicial">
+            ${radio('s', 'attack', settings.side === 'attack', '<strong>TR</strong><span>Ataque: plante a bomba no A ou no B</span>', 'side-tile atk')}
+            ${radio('s', 'defense', settings.side === 'defense', '<strong>CT</strong><span>Defesa: segure os sites e desarme</span>', 'side-tile def')}
+          </div>
+          <p class="side-note">Os times trocam de lado depois da rodada ${ROUND.halftimeAfterRound}.</p>
+          <div class="menu-row">
+            <span class="row-label" id="lvl-label">Nível dos bots</span>
+            <div class="seg levels" role="radiogroup" aria-labelledby="lvl-label">
+              ${LEVELS.map(([id, label]) => radio('d', id, settings.difficulty === id, label)).join('')}
+            </div>
+          </div>
+          <div class="menu-actions">
+            <button type="button" class="start-btn">Jogar</button>
+            <button type="button" class="menu-link restart-link" hidden>Recomeçar partida</button>
+            <button type="button" class="menu-link" data-go="howto">Como jogar</button>
+            <button type="button" class="menu-link" data-go="options">Opções</button>
+          </div>
+        </section>
+
+        <section class="menu-view view-howto" aria-labelledby="howto-title">
+          <h2 id="howto-title" tabindex="-1">Como jogar</h2>
+          <div class="howto-sides">
+            <div class="howto-side atk">
+              <h3>Como TR</h3>
+              <p>Leve a bomba até o site A ou B e segure Plantar por ${ROUND.plantSeconds}&nbsp;s. Depois proteja a bomba por ${ROUND.bombSeconds}&nbsp;s até ela explodir, ou elimine os CTs.</p>
+            </div>
+            <div class="howto-side def">
+              <h3>Como CT</h3>
+              <p>Impeça o plantio até o relógio zerar (${mins}:${secs}) ou elimine os TRs. Se a bomba for plantada, chegue nela e segure Desarmar por ${ROUND.defuseSeconds}&nbsp;s.</p>
+            </div>
+          </div>
+          <h3>Controles</h3>
+          <dl class="howto-controls">${controlsHtml(opts.isTouch)}</dl>
+          <h3>Dicas</h3>
+          <ul class="howto-tips">
+            <li>Um tiro na cabeça derruba; no corpo são três.</li>
+            <li>Agachado você erra menos e fica menor, mas anda devagar.</li>
+            <li>Parado, a mira assenta; correndo e pulando, os tiros se espalham.</li>
+            <li>Quem morre volta na rodada seguinte.</li>
+          </ul>
+          <button type="button" class="menu-link back" data-go="main">Voltar</button>
+        </section>
+
+        <section class="menu-view view-options" aria-labelledby="opt-title">
+          <h2 id="opt-title" tabindex="-1">Opções</h2>
+          <div class="menu-row">
+            <span class="row-label" id="gfx-label">Gráficos</span>
+            <div class="seg graphics" role="radiogroup" aria-labelledby="gfx-label">
+              ${radio('g', 'high', settings.graphics === 'high', 'Altos')}
+              ${radio('g', 'low', settings.graphics === 'low', 'Leves')}
+            </div>
+          </div>
+          <p class="side-note">Leves desliga sombras e relevo, para aparelhos mais fracos. Mudar recarrega o jogo.</p>
+          <div class="settings">
+            <label>Sensibilidade ${opts.isTouch ? 'do toque' : 'do mouse'}
+              <input type="range" name="sens" min="0.3" max="3" step="0.05" value="${settings[sensKey]}">
+              <output>${settings[sensKey].toFixed(2)}</output>
+            </label>
+            <label>Volume
+              <input type="range" name="vol" min="0" max="1" step="0.05" value="${settings.volume}">
+              <output>${Math.round(settings.volume * 100)}%</output>
+            </label>
+          </div>
+          <button type="button" class="menu-link back" data-go="main">Voltar</button>
+        </section>
       </div>`;
     parent.append(this.root);
     document.body.classList.add('menu-open');
 
-    this.root.querySelector('.start-btn')!.addEventListener('click', () => this.start());
+    const q = <T extends Element>(s: string) => this.root.querySelector<T>(s)!;
+    const qa = <T extends Element>(s: string) => this.root.querySelectorAll<T>(s);
 
-    const diffButtons = this.root.querySelectorAll<HTMLButtonElement>('.difficulty button[data-d]');
+    q('.start-btn').addEventListener('click', () => this.start());
+    q('.restart-link').addEventListener('click', () => {
+      opts.onRestart();
+      this.start();
+    });
+    qa<HTMLButtonElement>('[data-go]').forEach((b) => b.addEventListener('click', () => this.go(b.dataset.go as View)));
+
+    const diffButtons = qa<HTMLButtonElement>('[data-d]');
     diffButtons.forEach((b) =>
       b.addEventListener('click', () => {
         settings.difficulty = b.dataset.d as Difficulty;
@@ -75,8 +156,8 @@ export class StartOverlay {
       }),
     );
 
-    // Lado: recomeça a partida (no menu de pausa, avisa no texto do botão)
-    const sideButtons = this.root.querySelectorAll<HTMLButtonElement>('.side button');
+    // Lado: recomeça a partida (na pausa, o botão volta a ser "Jogar")
+    const sideButtons = qa<HTMLButtonElement>('[data-s]');
     sideButtons.forEach((b) =>
       b.addEventListener('click', () => {
         const side = b.dataset.s as Team;
@@ -85,12 +166,12 @@ export class StartOverlay {
         saveSettings();
         sideButtons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
         opts.onSideChange(side);
-        this.root.querySelector('.start-btn')!.textContent = 'Jogar';
+        this.setPaused(false);
       }),
     );
 
     // Gráficos: o cenário é montado na carga, então trocar exige recarregar
-    this.root.querySelectorAll<HTMLButtonElement>('.graphics button').forEach((b) =>
+    qa<HTMLButtonElement>('[data-g]').forEach((b) =>
       b.addEventListener('click', () => {
         const g = b.dataset.g as 'high' | 'low';
         if (g === settings.graphics) return;
@@ -100,7 +181,7 @@ export class StartOverlay {
       }),
     );
 
-    const [sens, vol] = this.root.querySelectorAll<HTMLInputElement>('input[type=range]');
+    const [sens, vol] = qa<HTMLInputElement>('input[type=range]');
     sens.addEventListener('input', () => {
       settings[sensKey] = Number(sens.value);
       sens.nextElementSibling!.textContent = settings[sensKey].toFixed(2);
@@ -114,10 +195,28 @@ export class StartOverlay {
     });
   }
 
-  show(label = 'Continuar'): void {
-    this.root.querySelector('.start-btn')!.textContent = label;
+  /** Abre o menu como pausa: "Continuar", "Recomeçar partida" e aviso de que trocar de lado recomeça. */
+  show(): void {
+    this.go('main');
+    this.setPaused(true);
     this.root.classList.remove('hidden');
     document.body.classList.add('menu-open');
+  }
+
+  private setPaused(paused: boolean): void {
+    this.root.querySelector('.start-btn')!.textContent = paused ? 'Continuar' : 'Jogar';
+    this.root.querySelector<HTMLButtonElement>('.restart-link')!.hidden = !paused;
+    this.root.querySelector('.side-note')!.textContent = paused
+      ? 'Trocar de lado aqui recomeça a partida.'
+      : `Os times trocam de lado depois da rodada ${ROUND.halftimeAfterRound}.`;
+  }
+
+  private go(view: View): void {
+    const panel = this.root.querySelector<HTMLElement>('.menu-panel')!;
+    panel.dataset.view = view;
+    panel.scrollTop = 0;
+    // Foco no primeiro controle da nova tela (teclado e leitores de tela)
+    panel.querySelector<HTMLElement>(`.view-${view} h2, .view-${view} .start-btn`)?.focus({ preventScroll: true });
   }
 
   private async start(): Promise<void> {

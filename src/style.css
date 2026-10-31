@@ -371,22 +371,150 @@ body.can-use .btn-use { display: block; }
 .explosion-flash { position: absolute; inset: 0; background: #fff6e0; opacity: 0; pointer-events: none !important; z-index: 9; }
 .overlay.match-over h1 { font-size: 44px; }
 
-/* Dificuldade */
-.difficulty { display: inline-flex; margin-top: 14px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2); }
-.difficulty button { font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border: 0; padding: 8px 16px; min-height: 40px; cursor: pointer; }
-.difficulty button[aria-checked="true"] { color: #fff; background: rgba(61, 139, 255, 0.45); }
-@media (max-height: 430px) { .difficulty { margin-top: 8px; } .difficulty button { min-height: 34px; padding: 6px 14px; } }
-
 /* Menu aberto: esconde o HUD do jogo por trás dele */
 body.menu-open :is(.round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
-.overlay.start { background: rgba(10, 12, 15, 0.86); }
+.crosshair.dead { visibility: hidden; }
 
-.difficulty.graphics { margin-left: 8px; }
-.difficulty.side { display: flex; width: fit-content; margin: 12px auto 0; }
-.difficulty.side button[data-s="attack"][aria-checked="true"] { background: rgba(230, 126, 34, 0.55); }
 /* Placar: o time do jogador ganha destaque */
 .round-board .team.mine { background: rgba(255, 255, 255, 0.14); }
 .round-board .team.mine .score::after { content: ' Você'; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); vertical-align: middle; }
 .round-board .team.def.mine .score::after { content: none; }
 .round-board .team.def.mine .score::before { content: 'Você '; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); vertical-align: middle; }
-.difficulty.graphics button { font-size: 12px; padding: 8px 12px; }
+
+/* ------------------------------------------------------------------ menu
+   Painel à esquerda com faixa de alerta (a mesma dos pilares do mapa);
+   a cena 3D continua visível à direita. */
+:root {
+  --concrete: #2b2e32;
+  --steel: #3b4046;
+  --hazard: #f2b705;
+  --paint: #e9e6df;
+  --ink: #16171a;
+}
+.overlay.start {
+  place-items: stretch start;
+  background: linear-gradient(90deg, rgba(14, 16, 19, 0.6), rgba(14, 16, 19, 0.15) 70%);
+  overflow: hidden;
+}
+.menu-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: min(500px, 64vw);
+  overflow-y: auto;
+  padding: calc(18px + var(--safe-t)) 28px calc(18px + var(--safe-b)) calc(40px + var(--safe-l));
+  background: rgba(43, 46, 50, 0.94);
+  color: var(--paint);
+  font-family: 'Saira', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.menu-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--safe-l);
+  width: 14px;
+  background: repeating-linear-gradient(-45deg, var(--hazard) 0 11px, var(--ink) 11px 22px);
+}
+.menu-view { display: none; flex-direction: column; gap: 12px; margin-block: auto; }
+.menu-panel[data-view='main'] .view-main,
+.menu-panel[data-view='howto'] .view-howto,
+.menu-panel[data-view='options'] .view-options { display: flex; }
+
+.menu-title {
+  margin: 0;
+  font-family: 'Saira Stencil One', 'Saira', sans-serif;
+  font-weight: 400;
+  font-size: clamp(36px, 11vh, 58px);
+  line-height: 0.95;
+  color: var(--paint);
+}
+.menu-sub { margin: -4px 0 2px; color: var(--muted); }
+.menu-panel h2 { margin: 0; font-size: 26px; font-weight: 700; outline: none; }
+.menu-panel h3 { margin: 4px 0 0; font-size: 16px; font-weight: 700; }
+.menu-panel p { margin: 0; }
+
+/* Escolha de lado: o elemento de destaque do menu */
+.side { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.side-tile {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  color: var(--paint);
+  background: var(--steel);
+  border: 2px solid transparent;
+  border-left-width: 6px;
+  border-radius: 3px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.side-tile strong { font-family: 'Saira Stencil One', 'Saira', sans-serif; font-weight: 400; font-size: 28px; line-height: 1; }
+.side-tile span { font-size: 13px; color: var(--muted); }
+.side-tile.atk { border-left-color: var(--orange); }
+.side-tile.def { border-left-color: var(--blue); }
+.side-tile.atk[aria-checked='true'] { border-color: var(--orange); background: rgba(255, 122, 47, 0.22); }
+.side-tile.def[aria-checked='true'] { border-color: var(--blue); background: rgba(61, 139, 255, 0.22); }
+.side-tile[aria-checked='true'] span { color: var(--paint); }
+.side-note { font-size: 13px; color: var(--muted); margin-top: -4px !important; }
+
+.menu-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.row-label { font-weight: 600; min-width: 112px; }
+.seg { display: inline-flex; border: 1px solid rgba(233, 230, 223, 0.25); border-radius: 3px; overflow: hidden; }
+.seg button { font: inherit; font-weight: 600; color: var(--muted); background: transparent; border: 0; padding: 6px 14px; min-height: 38px; cursor: pointer; }
+.seg button + button { border-left: 1px solid rgba(233, 230, 223, 0.15); }
+.seg button[aria-checked='true'] { color: var(--ink); background: var(--paint); }
+
+.menu-actions { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; margin-top: 4px; }
+.menu-panel .start-btn {
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--hazard);
+  border-radius: 3px;
+  padding: 10px 44px;
+  min-height: 50px;
+}
+.menu-link {
+  font: inherit;
+  font-weight: 600;
+  color: var(--paint);
+  background: none;
+  border: 0;
+  padding: 8px 2px;
+  min-height: 40px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(233, 230, 223, 0.35);
+  text-underline-offset: 4px;
+}
+.menu-link:hover { text-decoration-color: var(--hazard); }
+.menu-link.back { align-self: flex-start; }
+.menu-panel :is(button, input):focus-visible { outline: 3px solid var(--hazard); outline-offset: 2px; }
+
+.howto-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.howto-side { background: var(--steel); border-left: 6px solid var(--orange); border-radius: 3px; padding: 8px 12px; font-size: 14px; }
+.howto-side.def { border-left-color: var(--blue); }
+.howto-side h3 { margin: 0 0 2px; }
+.howto-controls { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
+.howto-controls dt { font-weight: 600; }
+.howto-controls dd { margin: 0; color: var(--muted); }
+.howto-tips { margin: 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+.howto-tips li + li { margin-top: 2px; }
+
+.menu-panel .settings { margin: 0; max-width: 360px; }
+
+@media (max-height: 400px) {
+  .menu-panel { padding-top: calc(12px + var(--safe-t)); padding-bottom: calc(12px + var(--safe-b)); }
+  .menu-view { gap: 9px; }
+  .side-tile { padding: 7px 10px; }
+  .side-tile strong { font-size: 24px; }
+  .seg button { min-height: 34px; }
+  .menu-panel .start-btn { min-height: 44px; padding: 8px 40px; }
+}
+@media (max-width: 560px) {
+  .menu-panel { width: 100%; }
+  .howto-sides { grid-template-columns: 1fr; }
+}

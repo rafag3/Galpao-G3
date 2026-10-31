@@ -63,7 +63,8 @@ export class Hud {
     this.hurtTimer = Math.max(0, this.hurtTimer - dt);
     this.vignette.style.opacity = String(Math.min(1, this.hurtTimer * 3));
     this.death.classList.toggle('show', !alive);
-    this.crosshair.style.visibility = alive ? 'visible' : 'hidden';
+    // Classe, não estilo inline: o inline venceria a regra que esconde o HUD sob o menu
+    this.crosshair.classList.toggle('dead', !alive);
     if (!alive)
       this.death.textContent =
         respawnIn < 0 ? 'Eliminado · aguardando a próxima rodada' : `Eliminado · renascendo em ${Math.max(0, Math.ceil(respawnIn))}`;

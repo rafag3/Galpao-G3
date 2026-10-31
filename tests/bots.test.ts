@@ -130,6 +130,25 @@ describe('bots', () => {
   });
 });
 
+describe('agachar', () => {
+  const crouchers = (sim: GameSim) => sim.bots.filter((b) => b.combatant.controller.state.crouching).length;
+
+  it('troca tiro agachado conforme a chance da dificuldade, e só com alvo distante', async () => {
+    const { SKILLS } = await import('../src/sim/config');
+    for (const [chance, expected] of [[1, true], [0, false]] as const) {
+      const sim = simWithBotsPosted();
+      for (const b of sim.bots) b.brain.skill = { ...SKILLS.normal, crouchChance: chance };
+      sim.human.controller.teleport(plan(33, 34), 0); // ~13 m do bot do mid
+      let seen = 0;
+      for (let i = 0; i < 2 * SIM_HZ && sim.human.alive; i++) {
+        run(sim, 1 / SIM_HZ);
+        seen = Math.max(seen, crouchers(sim));
+      }
+      expect(seen > 0, `chance ${chance}`).toBe(expected);
+    }
+  });
+});
+
 describe('dificuldade', () => {
   it('vale para aliados e adversários (simétrica)', async () => {
     const { SKILLS } = await import('../src/sim/config');

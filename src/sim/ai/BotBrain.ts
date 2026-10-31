@@ -94,6 +94,8 @@ export class BotBrain {
   private aimNoiseYaw = 0;
   private aimNoisePitch = 0;
   private firing = false;
+  /** Decidido a cada novo avistamento: troca tiro agachado e sem se mover de lado. */
+  private crouchFight = false;
   private phaseUntil = 0;
   private strafe = 0;
 
@@ -132,6 +134,7 @@ export class BotBrain {
     this.target = null;
     this.lastKnown = null;
     this.firing = false;
+    this.crouchFight = false;
   }
 
   /** Para testes e diagnóstico. */
@@ -173,6 +176,7 @@ export class BotBrain {
           this.firstSeenAt = time;
           this.aimNoiseYaw = (ctx.rng.next() * 2 - 1) * this.skill.aimErrorStart;
           this.aimNoisePitch = (ctx.rng.next() * 2 - 1) * this.skill.aimErrorStart * 0.5;
+          this.crouchFight = bestD > BOT.crouchMinDistance && ctx.rng.next() < this.skill.crouchChance;
         }
         this.lastKnown = { ...this.target.controller.state.feet };
         team.lastKnown = this.lastKnown;
@@ -313,7 +317,12 @@ export class BotBrain {
         const reacted = time - this.firstSeenAt >= this.skill.reactionSeconds;
         const onTarget =
           Math.abs(wrap(desiredYaw - this.yaw)) < BOT.fireCone && Math.abs(desiredPitch - this.pitch) < BOT.fireCone;
-        if (weapon.mag === 0) {
+        if (this.crouchFight) {
+          // Agachado: atira em rajadas e recarrega no lugar, sem andar de lado
+          intent.crouch = true;
+          if (weapon.mag === 0) intent.reload = true;
+          else intent.fire = this.firing && reacted && onTarget;
+        } else if (weapon.mag === 0) {
           intent.reload = true;
           intent.moveX = this.strafe || 1;
         } else if (this.firing) {
@@ -340,8 +349,9 @@ export class BotBrain {
       }
       case 'hold': {
         if (this.objective.use) {
-          // Plantando/desarmando: parado, segurando a ação
+          // Plantando/desarmando: agachado e parado, segurando a ação
           intent.use = true;
+          intent.crouch = true;
           desiredYaw = this.objective.watchYaw;
         } else {
           desiredYaw = this.objective.watchYaw + Math.sin(time * 0.6 + this.sweepPhase) * 0.55;
