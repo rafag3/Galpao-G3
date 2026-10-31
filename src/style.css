@@ -219,20 +219,20 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 }
 .touch-btn:active { background: rgba(61, 139, 255, 0.55); }
 .touch-btn.on { background: rgba(61, 139, 255, 0.55); }
-.btn-fire { width: 84px; height: 84px; font-size: 13px; border-color: rgba(255, 122, 47, 0.8); background: rgba(255, 122, 47, 0.28); }
+.btn-fire { width: 92px; height: 92px; font-size: 13px; border-color: rgba(255, 122, 47, 0.8); background: rgba(255, 122, 47, 0.28); }
 .btn-fire.on { background: rgba(255, 122, 47, 0.7); }
-.btn-fire-r { right: calc(30px + var(--safe-r)); bottom: calc(112px + var(--safe-b)); }
-.btn-fire-l { left: calc(28px + var(--safe-l)); bottom: calc(200px + var(--safe-b)); width: 70px; height: 70px; }
-.btn-reload { right: calc(130px + var(--safe-r)); bottom: calc(128px + var(--safe-b)); width: 56px; height: 56px; font-size: 10px; }
+/* Atirar embaixo, ao lado do Pular: posição natural do polegar */
+.btn-fire-r { right: calc(108px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); }
+.btn-fire-l { left: calc(28px + var(--safe-l)); bottom: calc(200px + var(--safe-b)); width: 77px; height: 77px; }
+.btn-reload { right: calc(126px + var(--safe-r)); bottom: calc(126px + var(--safe-b)); width: 56px; height: 56px; font-size: 10px; }
 .btn-jump { right: calc(30px + var(--safe-r)); bottom: calc(22px + var(--safe-b)); width: 64px; height: 64px; }
-.btn-crouch { right: calc(112px + var(--safe-r)); bottom: calc(18px + var(--safe-b)); width: 60px; height: 60px; }
+.btn-crouch { right: calc(32px + var(--safe-r)); bottom: calc(106px + var(--safe-b)); width: 60px; height: 60px; }
 .btn-crouch.on { background: rgba(255, 122, 47, 0.6); border-color: var(--orange); }
 
 /* Telas baixas (celular na horizontal com barra do navegador) */
 @media (max-height: 360px) {
   .btn-fire-l { bottom: calc(170px + var(--safe-b)); }
-  .btn-fire-r { bottom: calc(96px + var(--safe-b)); }
-  .btn-reload { bottom: calc(110px + var(--safe-b)); }
+  .btn-reload { bottom: calc(118px + var(--safe-b)); }
 }
 
 /* Aviso de orientação (só touch, em retrato) */
