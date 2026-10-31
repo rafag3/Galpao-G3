@@ -23,6 +23,7 @@ export class PhysicsWorld {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 
     for (const block of level.blocks) {
+      if (block.collide === false) continue; // só visual
       const [hx, hy, hz] = block.size.map((s) => s / 2);
       const [rx, ry, rz] = block.rotation ?? [0, 0, 0];
       const desc = RAPIER.ColliderDesc.cuboid(hx, hy, hz)

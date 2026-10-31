@@ -16,6 +16,7 @@ import type { BlockKind, LevelData } from '../level/LevelData';
 import { quatFromEuler, type Vec3 } from '../sim/math';
 import type { TargetState } from '../sim/TargetSystem';
 import { ImpactDecals } from './ImpactDecals';
+import { buildSiteSigns } from './SiteSigns';
 import { TargetViews } from './TargetViews';
 import { ViewModel } from './ViewModel';
 
@@ -26,6 +27,10 @@ const PALETTE: Record<BlockKind, { main: string; line: string }> = {
   crate: { main: '#8a7a62', line: '#a8977c' },
   container: { main: '#4f6a80', line: '#6b8aa3' },
   ramp: { main: '#757a6e', line: '#949a8b' },
+  roof: { main: '#5d6267', line: '#71767b' },
+  pillar: { main: '#5a5f66', line: '#6f747b' },
+  truck: { main: '#8a3b2b', line: '#a34d3b' },
+  siteMarking: { main: '#b8862a', line: '#d9a441' },
 };
 
 /** Limite de resolução interna: telas de celular têm DPR 3, o que custa caro. */
@@ -54,8 +59,8 @@ export class GameRenderer {
     scene.skipPointerMovePicking = true; // não usamos picking do Babylon
     scene.fogMode = Scene.FOGMODE_LINEAR;
     scene.fogColor = new Color3(0.66, 0.7, 0.75);
-    scene.fogStart = 25;
-    scene.fogEnd = 70;
+    scene.fogStart = 35;
+    scene.fogEnd = 110;
 
     this.camera = new FreeCamera('player-cam', Vector3.Zero(), scene);
     this.camera.minZ = 0.05;
@@ -70,6 +75,7 @@ export class GameRenderer {
     sun.intensity = 0.55;
 
     this.buildLevel(level);
+    buildSiteSigns(scene, level.bombsites ?? []);
     this.targets = new TargetViews(scene, targets);
     this.impacts = new ImpactDecals(scene);
     this.viewModel = new ViewModel(scene, this.camera);
@@ -111,7 +117,7 @@ export class GameRenderer {
     m.gridRatio = 1;
     m.majorUnitFrequency = 4;
     m.minorUnitVisibility = 0.35;
-    m.opacity = 0.99;
+    m.opacity = 1; // < 1 joga a malha no modo transparente e as paredes viram "vidro"
     m.freeze();
     return m;
   }

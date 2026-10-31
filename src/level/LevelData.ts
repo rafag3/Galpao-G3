@@ -3,7 +3,17 @@
 
 import type { Vec3 } from '../sim/math';
 
-export type BlockKind = 'floor' | 'wall' | 'crate' | 'container' | 'ramp' | 'ceiling';
+export type BlockKind =
+  | 'floor'
+  | 'wall'
+  | 'crate'
+  | 'container'
+  | 'ramp'
+  | 'ceiling'
+  | 'roof'
+  | 'pillar'
+  | 'truck'
+  | 'siteMarking';
 
 export interface Block {
   kind: BlockKind;
@@ -13,6 +23,8 @@ export interface Block {
   size: [number, number, number];
   /** Rotação Euler em radianos (ordem Y → X → Z). */
   rotation?: [number, number, number];
+  /** false = só visual (pintura de chão, por exemplo). Padrão: true. */
+  collide?: boolean;
 }
 
 /** Alvo de treino com silhueta humana (corpo + cabeça). */
@@ -23,6 +35,16 @@ export interface TargetSpawn {
   yaw: number;
 }
 
+/** Retângulo no chão, em coordenadas de mundo (x, z). */
+export interface Area {
+  min: [number, number];
+  max: [number, number];
+}
+
+export interface Bombsite extends Area {
+  id: 'A' | 'B';
+}
+
 export interface LevelData {
   name: string;
   blocks: Block[];
@@ -30,4 +52,8 @@ export interface LevelData {
   spawn: Vec3;
   /** Yaw inicial do jogador, em radianos. */
   spawnYaw: number;
+  /** Áreas de plantio da bomba (usadas a partir da Fase 5). */
+  bombsites?: Bombsite[];
+  /** Zonas de nascimento das equipes (usadas a partir da Fase 5). */
+  spawnZones?: { attack: Area; defense: Area };
 }

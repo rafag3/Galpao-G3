@@ -2,7 +2,9 @@
 
 FPS tático 3D original para navegador, com foco em celular (touch, horizontal) e suporte a PC (teclado e mouse).
 
-**Estado atual:** Fase 2 — combate. Cena cinza de testes com movimento em primeira pessoa, fuzil hitscan, alvos com hitbox de corpo e cabeça, e controles touch + teclado/mouse.
+**Estado atual:** Fase 3 — blockout do mapa **Galpão** (72 × 64 m, dois bombsites, três rotas de ataque), com movimento, fuzil hitscan e alvos no lugar dos defensores. O campo de testes antigo abre com `?mapa=teste`.
+
+**Modo de jogo (alvo):** como o Counter-Strike — o ataque planta a bomba em A ou B; a defesa impede ou desarma.
 
 ## Stack
 
@@ -48,7 +50,8 @@ src/
              PhysicsWorld, weapons (dados), events, rng  ← sem Babylon, sem DOM
   render/    GameRenderer, ViewModel, TargetViews, ImpactDecals: só leem o estado
   audio/     SoundFx: sons sintetizados provisórios (Web Audio)
-  level/     Níveis como dados, lidos pela física e pelo render
+  level/     Níveis como dados. galpao.ts descreve as áreas caminháveis e os
+             objetos; walkableGrid gera as paredes do resto (greedy meshing)
   ui/        Tela inicial, painel de diagnóstico
 tests/       Testes da simulação (Node)
 ```
@@ -65,7 +68,7 @@ Regras que sustentam a evolução para multiplayer:
 ## Orçamento de performance (alvo)
 
 - 60 FPS como meta e 30 como piso, num Android intermediário e num iPhone com Safari
-- Até ~100 mil triângulos visíveis e ~150 draw calls (cena atual: 15)
+- Até ~100 mil triângulos visíveis e ~150 draw calls (Galpão: 22)
 - Resolução interna limitada a 1,5x o DPR
 - Download inicial até ~15 MB (atual: ~2 MB gzip)
 
@@ -74,7 +77,7 @@ Regras que sustentam a evolução para multiplayer:
 0. ✅ Teste de stack: cena, controles touch e mouse, deploy
 1. ✅ Sensibilidade configurável e volume (salvos no aparelho)
 2. ✅ Arma hitscan, cadência, dano por parte do corpo, dispersão, recuo, recarga, alvos com respawn, sons provisórios
-3. Blockout do mapa do galpão com bombsites
+3. ✅ Blockout do mapa Galpão: rotas validadas por teste (A ~11 s, B ~9,5 s, estreita ~9 s, defesa ~4 s)
 4. Bots (navmesh com recast-navigation)
 5. Rodadas, placar e bomba
 6. HUD final, menu e opções
