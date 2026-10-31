@@ -27,17 +27,20 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 100dvh: no Safari, 100% / inset:0 incluem a área sob as barras do
+   navegador, o que cortava o joystick e os botões de baixo */
 #game {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: 100%;
+  height: 100dvh;
   display: block;
   touch-action: none;
   outline: none;
 }
 
-#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui { position: fixed; top: 0; left: 0; width: 100%; height: 100dvh; pointer-events: none; }
 #ui > * { pointer-events: auto; }
 
 /* Mira dinâmica: abre com a dispersão real da arma */
@@ -157,12 +160,14 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 /* Debug */
 .debug-hud {
   position: absolute;
-  top: calc(8px + var(--safe-t));
-  left: calc(8px + var(--safe-l));
-  padding: 6px 8px;
+  top: calc(6px + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.8;
+  padding: 4px 8px;
   border-radius: 6px;
   background: var(--panel);
-  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: pre;
   pointer-events: none !important;
   z-index: 5;

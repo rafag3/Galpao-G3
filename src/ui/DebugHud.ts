@@ -21,8 +21,8 @@ export class DebugHud {
     const speed = Math.hypot(p.velocity.x, p.velocity.z);
     const state = p.crouching ? 'agachado' : p.grounded ? 'no chão' : 'no ar';
     this.el.textContent =
-      `${engine.getFps().toFixed(0)} fps · ${drawCalls} draws\n` +
-      `${speed.toFixed(1)} m/s · ${state}\n` +
+      `${engine.getFps().toFixed(0)} fps · ${drawCalls} draws · ` +
+      `${speed.toFixed(1)} m/s · ${state} · ` +
       `x ${p.feet.x.toFixed(1)}  y ${p.feet.y.toFixed(2)}  z ${p.feet.z.toFixed(1)}`;
   }
 }
