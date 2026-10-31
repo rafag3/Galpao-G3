@@ -1,0 +1,13 @@
+{
+  "name": "Galpão G3",
+  "short_name": "Galpão G3",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1b1f24",
+  "theme_color": "#1b1f24",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
