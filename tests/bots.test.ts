@@ -129,3 +129,16 @@ describe('bots', () => {
     expect(a.human.health).toBe(b.human.health);
   });
 });
+
+describe('dificuldade', () => {
+  it('muda só os bots adversários', async () => {
+    const { SKILLS } = await import('../src/sim/config');
+    const sim = new GameSim(galpao, 1, { difficulty: 'easy' });
+    const enemies = sim.bots.filter((b) => b.combatant.team === 'defense');
+    const allies = sim.bots.filter((b) => b.combatant.team === 'attack');
+    expect(enemies.every((b) => b.brain.skill === SKILLS.easy)).toBe(true);
+    sim.setDifficulty('hard');
+    expect(enemies.every((b) => b.brain.skill === SKILLS.hard)).toBe(true);
+    expect(allies.every((b) => b.brain.skill === SKILLS.normal)).toBe(true);
+  });
+});

@@ -14,7 +14,7 @@
 import { emptyIntent, type MoveIntent } from '../../input/InputIntents';
 import type { BotPost } from '../../level/LevelData';
 import type { Combatant } from '../Combatant';
-import { BOT } from '../config';
+import { BOT, type BotSkill, SKILLS } from '../config';
 import type { EntityId } from '../events';
 import type { HitRegistry } from '../HitRegistry';
 import { clamp, lerp, type Vec3 } from '../math';
@@ -105,6 +105,8 @@ export class BotBrain {
   constructor(
     public objective: Objective,
     index: number,
+    /** Dificuldade: reação, mira, alcance de visão. */
+    public skill: BotSkill = SKILLS.normal,
   ) {
     this.visionTimer = index * 0.05; // escalona os raycasts entre bots
     this.sweepPhase = index * 2.1;
@@ -169,8 +171,8 @@ export class BotBrain {
       if (this.visible && this.target) {
         if (!wasVisible) {
           this.firstSeenAt = time;
-          this.aimNoiseYaw = (ctx.rng.next() * 2 - 1) * BOT.aimErrorStart;
-          this.aimNoisePitch = (ctx.rng.next() * 2 - 1) * BOT.aimErrorStart * 0.5;
+          this.aimNoiseYaw = (ctx.rng.next() * 2 - 1) * this.skill.aimErrorStart;
+          this.aimNoisePitch = (ctx.rng.next() * 2 - 1) * this.skill.aimErrorStart * 0.5;
         }
         this.lastKnown = { ...this.target.controller.state.feet };
         team.lastKnown = this.lastKnown;
@@ -209,7 +211,7 @@ export class BotBrain {
     const dx = ef.x - eye.x;
     const dz = ef.z - eye.z;
     const d = Math.hypot(dx, dz);
-    if (d > BOT.viewDistance) return null;
+    if (d > this.skill.viewDistance) return null;
     const off = Math.abs(wrap(Math.atan2(dx, dz) - this.yaw));
     if (off > BOT.halfFov && d > BOT.proximitySense) return null;
 
@@ -292,23 +294,23 @@ export class BotBrain {
         desiredPitch = Math.atan2(eye.y - p.y, Math.hypot(dx, dz));
 
         // Erro de mira: começa grande e assenta enquanto rastreia o alvo
-        const settle = clamp((time - this.firstSeenAt) / BOT.aimSettleSeconds, 0, 1);
-        const err = lerp(BOT.aimErrorStart, BOT.aimErrorEnd, settle);
+        const settle = clamp((time - this.firstSeenAt) / this.skill.aimSettleSeconds, 0, 1);
+        const err = lerp(this.skill.aimErrorStart, this.skill.aimErrorEnd, settle);
         this.aimNoiseYaw = clamp(this.aimNoiseYaw + (ctx.rng.next() - 0.5) * err * 4 * dt, -err, err);
         this.aimNoisePitch = clamp(this.aimNoisePitch + (ctx.rng.next() - 0.5) * err * 2 * dt, -err * 0.5, err * 0.5);
-        this.aimNoiseYaw *= 1 - (1 - err / BOT.aimErrorStart) * dt * 2;
-        this.aimNoisePitch *= 1 - (1 - err / BOT.aimErrorStart) * dt * 2;
+        this.aimNoiseYaw *= 1 - (1 - err / this.skill.aimErrorStart) * dt * 2;
+        this.aimNoisePitch *= 1 - (1 - err / this.skill.aimErrorStart) * dt * 2;
         desiredYaw += this.aimNoiseYaw;
         desiredPitch += this.aimNoisePitch;
 
         // Alterna rajada (parado, preciso) e pausa (se movendo de lado)
         if (time >= this.phaseUntil) {
           this.firing = !this.firing;
-          const [a, b] = this.firing ? BOT.burstSeconds : BOT.pauseSeconds;
+          const [a, b] = this.firing ? this.skill.burstSeconds : this.skill.pauseSeconds;
           this.phaseUntil = time + a + ctx.rng.next() * (b - a);
           if (!this.firing) this.strafe = ctx.rng.next() < 0.5 ? -1 : 1;
         }
-        const reacted = time - this.firstSeenAt >= BOT.reactionSeconds;
+        const reacted = time - this.firstSeenAt >= this.skill.reactionSeconds;
         const onTarget =
           Math.abs(wrap(desiredYaw - this.yaw)) < BOT.fireCone && Math.abs(desiredPitch - this.pitch) < BOT.fireCone;
         if (weapon.mag === 0) {
@@ -350,7 +352,7 @@ export class BotBrain {
     }
 
     // Giro com velocidade limitada: o bot não "teleporta" a mira
-    const maxTurn = BOT.turnSpeed * dt;
+    const maxTurn = this.skill.turnSpeed * dt;
     this.yaw = wrap(this.yaw + clamp(wrap(desiredYaw - this.yaw), -maxTurn, maxTurn));
     this.pitch += clamp(desiredPitch - this.pitch, -maxTurn, maxTurn);
     intent.yaw = this.yaw;

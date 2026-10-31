@@ -1,16 +1,20 @@
 // Preferências do jogador, salvas no aparelho. localStorage pode estar
 // indisponível (aba anônima, Safari restrito), então tudo tem fallback.
 
+import type { Difficulty } from '../sim/config';
+
 export interface SettingsData {
   /** Multiplicador da sensibilidade do mouse. */
   mouseSensitivity: number;
   /** Multiplicador da sensibilidade do arraste touch. */
   touchSensitivity: number;
   volume: number;
+  difficulty: Difficulty;
 }
 
 const KEY = 'galpao.settings.v1';
-const DEFAULTS: SettingsData = { mouseSensitivity: 1, touchSensitivity: 1, volume: 0.7 };
+// Fácil por padrão: no touch o jogador reage mais devagar que no mouse
+const DEFAULTS: SettingsData = { mouseSensitivity: 1, touchSensitivity: 1, volume: 0.7, difficulty: 'easy' };
 
 function load(): SettingsData {
   try {
@@ -19,10 +23,11 @@ function load(): SettingsData {
     const parsed = JSON.parse(raw) as Partial<SettingsData>;
     const out = { ...DEFAULTS };
     // Só aceita números válidos: dado corrompido não quebra o jogo
-    for (const k of Object.keys(DEFAULTS) as (keyof SettingsData)[]) {
+    for (const k of ['mouseSensitivity', 'touchSensitivity', 'volume'] as const) {
       const v = parsed[k];
       if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
     }
+    if (parsed.difficulty === 'easy' || parsed.difficulty === 'normal' || parsed.difficulty === 'hard') out.difficulty = parsed.difficulty;
     return out;
   } catch {
     return { ...DEFAULTS };

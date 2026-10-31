@@ -3,11 +3,19 @@
 // cheia, trava de orientação, pointer lock e áudio.
 
 import { saveSettings, settings } from '../core/Settings';
+import type { Difficulty } from '../sim/config';
+
+const LEVELS: [Difficulty, string][] = [
+  ['easy', 'Fácil'],
+  ['normal', 'Normal'],
+  ['hard', 'Difícil'],
+];
 
 export interface StartOptions {
   isTouch: boolean;
   onStart: () => void;
   onVolumeChange: (v: number) => void;
+  onDifficultyChange: (d: Difficulty) => void;
 }
 
 export class StartOverlay {
@@ -22,6 +30,9 @@ export class StartOverlay {
         <h1>Galpão G3</h1>
         <p class="phase">Modo bomba · 3 contra 3</p>
         <button type="button" class="start-btn">Jogar</button>
+        <div class="difficulty" role="radiogroup" aria-label="Dificuldade">
+          ${LEVELS.map(([id, label]) => `<button type="button" role="radio" data-d="${id}" aria-checked="${settings.difficulty === id}">${label}</button>`).join('')}
+        </div>
         <div class="settings">
           <label>Sensibilidade ${opts.isTouch ? 'do toque' : 'do mouse'}
             <input type="range" name="sens" min="0.3" max="3" step="0.05" value="${settings[sensKey]}">
@@ -39,8 +50,19 @@ export class StartOverlay {
         }</p>
       </div>`;
     parent.append(this.root);
+    document.body.classList.add('menu-open');
 
     this.root.querySelector('.start-btn')!.addEventListener('click', () => this.start());
+
+    const diffButtons = this.root.querySelectorAll<HTMLButtonElement>('.difficulty button');
+    diffButtons.forEach((b) =>
+      b.addEventListener('click', () => {
+        settings.difficulty = b.dataset.d as Difficulty;
+        saveSettings();
+        diffButtons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        opts.onDifficultyChange(settings.difficulty);
+      }),
+    );
 
     const [sens, vol] = this.root.querySelectorAll<HTMLInputElement>('input[type=range]');
     sens.addEventListener('input', () => {
@@ -59,10 +81,12 @@ export class StartOverlay {
   show(label = 'Continuar'): void {
     this.root.querySelector('.start-btn')!.textContent = label;
     this.root.classList.remove('hidden');
+    document.body.classList.add('menu-open');
   }
 
   private async start(): Promise<void> {
     this.root.classList.add('hidden');
+    document.body.classList.remove('menu-open');
     // onStart primeiro: áudio e pointer lock precisam do gesto ainda "vivo"
     this.opts.onStart();
     if (this.opts.isTouch) await enterFullscreenLandscape();

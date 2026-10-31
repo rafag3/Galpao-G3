@@ -370,3 +370,13 @@ body.can-plant .btn-use { display: block; }
 .bomb-chip.show, .round-alert.show, .use-progress.show, .round-banner.show { display: block; }
 .explosion-flash { position: absolute; inset: 0; background: #fff6e0; opacity: 0; pointer-events: none !important; z-index: 9; }
 .overlay.match-over h1 { font-size: 44px; }
+
+/* Dificuldade */
+.difficulty { display: inline-flex; margin-top: 14px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2); }
+.difficulty button { font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border: 0; padding: 8px 16px; min-height: 40px; cursor: pointer; }
+.difficulty button[aria-checked="true"] { color: #fff; background: rgba(61, 139, 255, 0.45); }
+@media (max-height: 430px) { .difficulty { margin-top: 8px; } .difficulty button { min-height: 34px; padding: 6px 14px; } }
+
+/* Menu aberto: esconde o HUD do jogo por trás dele */
+body.menu-open :is(.round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
+.overlay.start { background: rgba(10, 12, 15, 0.86); }

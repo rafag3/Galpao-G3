@@ -100,3 +100,54 @@ export const ROUND = {
   /** Quem planta/desarma precisa estar quase parado. */
   maxUseSpeed: 0.6,
 };
+
+/** Parte da IA que muda com a dificuldade. */
+export interface BotSkill {
+  reactionSeconds: number;
+  viewDistance: number;
+  turnSpeed: number;
+  aimErrorStart: number;
+  aimErrorEnd: number;
+  aimSettleSeconds: number;
+  burstSeconds: readonly [number, number];
+  pauseSeconds: readonly [number, number];
+}
+
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+/**
+ * Referência medida (jogador parado a 13 m, mediana do tempo até morrer):
+ * fácil ~2,9 s · normal ~1,7 s · difícil ~1,0 s.
+ */
+export const SKILLS: Record<Difficulty, BotSkill> = {
+  easy: {
+    reactionSeconds: 0.95,
+    viewDistance: 35,
+    turnSpeed: 3,
+    aimErrorStart: 0.16,
+    aimErrorEnd: 0.035,
+    aimSettleSeconds: 3,
+    burstSeconds: [0.15, 0.3],
+    pauseSeconds: [0.5, 0.9],
+  },
+  normal: {
+    reactionSeconds: BOT.reactionSeconds,
+    viewDistance: BOT.viewDistance,
+    turnSpeed: BOT.turnSpeed,
+    aimErrorStart: BOT.aimErrorStart,
+    aimErrorEnd: BOT.aimErrorEnd,
+    aimSettleSeconds: BOT.aimSettleSeconds,
+    burstSeconds: BOT.burstSeconds,
+    pauseSeconds: BOT.pauseSeconds,
+  },
+  hard: {
+    reactionSeconds: 0.38,
+    viewDistance: 55,
+    turnSpeed: 6,
+    aimErrorStart: 0.06,
+    aimErrorEnd: 0.009,
+    aimSettleSeconds: 1.2,
+    burstSeconds: [0.25, 0.5],
+    pauseSeconds: [0.25, 0.5],
+  },
+};

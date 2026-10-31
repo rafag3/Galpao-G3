@@ -19,6 +19,7 @@ import { RoundHud } from '../ui/RoundHud';
 import { inSite } from '../sim/RoundSystem';
 import { StartOverlay } from '../ui/StartOverlay';
 import { FixedStepLoop } from './FixedStepLoop';
+import { settings } from './Settings';
 
 export const isTouchDevice = () =>
   window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -52,7 +53,7 @@ export class Game {
 
   async init(level: LevelData, simOptions: SimOptions = {}): Promise<void> {
     await initPhysics();
-    this.sim = new GameSim(level, Date.now() % 100000, simOptions);
+    this.sim = new GameSim(level, Date.now() % 100000, { difficulty: settings.difficulty, ...simOptions });
     this.renderer = new GameRenderer(this.canvas, level, this.sim.targets.targets);
     this.currEye = this.prevEye = this.sim.player.eyePosition();
     this.view = { yaw: level.spawnYaw, pitch: 0 };
@@ -96,6 +97,7 @@ export class Game {
         if (!touch) this.keyboard?.requestLock();
       },
       onVolumeChange: (v) => this.sound.setVolume(v),
+      onDifficultyChange: (d) => this.sim.setDifficulty(d),
     });
 
     const pause = () => {

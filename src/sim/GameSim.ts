@@ -11,7 +11,7 @@ import type { Area, LevelData } from '../level/LevelData';
 import { BotBrain, type Noise, objectiveFromPost, type TeamMemory } from './ai/BotBrain';
 import { TeamCommander } from './ai/TeamCommander';
 import { type Combatant, type Team } from './Combatant';
-import { COMBAT, SIM_DT } from './config';
+import { COMBAT, type Difficulty, SIM_DT, SKILLS } from './config';
 import { type EntityId, EventQueue, type HitPart, type SimEvent } from './events';
 import { type HitInfo, HitRegistry } from './HitRegistry';
 import type { Vec3 } from './math';
@@ -36,6 +36,8 @@ export interface SimOptions {
   allies?: number;
   /** false = desliga rodadas mesmo em mapa competitivo. */
   rounds?: boolean;
+  /** Dificuldade dos bots inimigos (padrão: normal). Aliados usam normal. */
+  difficulty?: Difficulty;
 }
 
 const emptyMemory = (): TeamMemory => ({ lastKnown: null, at: -99, spotter: null, responder: null });
@@ -74,7 +76,7 @@ export class GameSim {
       let n = 0;
       level.defensePosts.forEach((post) => {
         const c = this.createCombatant(`bot:${n}`, 'defense', this.spawnPoint(zones.defense, n, level.defensePosts!.length), Math.PI, COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
-        const brain = new BotBrain(objectiveFromPost(post), n);
+        const brain = new BotBrain(objectiveFromPost(post), n, SKILLS[opts.difficulty ?? 'normal']);
         brain.reset(Math.PI);
         this.bots.push({ combatant: c, brain });
         n++;
@@ -224,6 +226,11 @@ export class GameSim {
       });
     }
     this.teams = { attack: emptyMemory(), defense: emptyMemory() };
+  }
+
+  /** Dificuldade dos bots adversários do jogador humano. */
+  setDifficulty(d: Difficulty): void {
+    for (const b of this.bots) if (b.combatant.team !== this.human.team) b.brain.skill = SKILLS[d];
   }
 
   /** Recomeça a partida (botão "Jogar de novo"). */
