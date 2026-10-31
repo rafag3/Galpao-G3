@@ -1,6 +1,7 @@
 // Preferências do jogador, salvas no aparelho. localStorage pode estar
 // indisponível (aba anônima, Safari restrito), então tudo tem fallback.
 
+import type { Team } from '../sim/Combatant';
 import type { Difficulty } from '../sim/config';
 
 export interface SettingsData {
@@ -11,11 +12,13 @@ export interface SettingsData {
   volume: number;
   difficulty: Difficulty;
   graphics: 'high' | 'low';
+  /** Lado em que o jogador começa a partida (troca no intervalo). */
+  side: Team;
 }
 
 const KEY = 'galpao.settings.v1';
 // Fácil por padrão: no touch o jogador reage mais devagar que no mouse
-const DEFAULTS: SettingsData = { mouseSensitivity: 1, touchSensitivity: 1, volume: 0.7, difficulty: 'easy', graphics: 'high' };
+const DEFAULTS: SettingsData = { mouseSensitivity: 1, touchSensitivity: 1, volume: 0.7, difficulty: 'easy', graphics: 'high', side: 'attack' };
 
 function load(): SettingsData {
   try {
@@ -29,6 +32,7 @@ function load(): SettingsData {
       if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
     }
     if (parsed.graphics === 'high' || parsed.graphics === 'low') out.graphics = parsed.graphics;
+    if (parsed.side === 'attack' || parsed.side === 'defense') out.side = parsed.side;
     if (parsed.difficulty === 'easy' || parsed.difficulty === 'normal' || parsed.difficulty === 'hard') out.difficulty = parsed.difficulty;
     return out;
   } catch {

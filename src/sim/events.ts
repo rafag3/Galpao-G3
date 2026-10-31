@@ -17,6 +17,8 @@ export type SimEvent =
   | { type: 'reloadEnd'; shooter: EntityId }
   | { type: 'respawn'; id: EntityId }
   | { type: 'roundStart'; round: number }
+  /** Intervalo: todos trocaram de lado (o placar acompanha cada time). */
+  | { type: 'halftime' }
   | { type: 'freezeEnd' }
   | { type: 'bombPickup'; by: EntityId }
   | { type: 'bombDropped'; position: Vec3 }

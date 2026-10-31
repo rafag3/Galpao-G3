@@ -7,7 +7,7 @@ import { KeyboardMouseInput } from '../input/KeyboardMouseInput';
 import { TouchInput } from '../input/TouchInput';
 import type { LevelData } from '../level/LevelData';
 import { GameRenderer } from '../render/GameRenderer';
-import { LOOK, MOVE, SIM_DT } from '../sim/config';
+import { LOOK, MOVE, ROUND, SIM_DT } from '../sim/config';
 import { viewOf } from '../sim/Combatant';
 import type { EntityId, SimEvent } from '../sim/events';
 import { GameSim, type SimOptions } from '../sim/GameSim';
@@ -15,7 +15,7 @@ import { clamp, lerp, type Vec3 } from '../sim/math';
 import { initPhysics } from '../sim/PhysicsWorld';
 import { DebugHud } from '../ui/DebugHud';
 import { Hud } from '../ui/Hud';
-import { RoundHud } from '../ui/RoundHud';
+import { type BombAction, RoundHud } from '../ui/RoundHud';
 import { inSite } from '../sim/RoundSystem';
 import { StartOverlay } from '../ui/StartOverlay';
 import { FixedStepLoop } from './FixedStepLoop';
@@ -31,6 +31,7 @@ export class Game {
   private readonly sound = new SoundFx();
   private loop!: FixedStepLoop;
   private keyboard?: KeyboardMouseInput;
+  private touch?: TouchInput;
   private debug?: DebugHud;
   private hud?: Hud;
   private roundHud?: RoundHud;
@@ -53,17 +54,17 @@ export class Game {
 
   async init(level: LevelData, simOptions: SimOptions = {}): Promise<void> {
     await initPhysics();
-    this.sim = new GameSim(level, Date.now() % 100000, { difficulty: settings.difficulty, ...simOptions });
+    this.sim = new GameSim(level, Date.now() % 100000, { difficulty: settings.difficulty, side: settings.side, ...simOptions });
     // ?graficos=leve força o modo leve (aparelhos fracos e testes automatizados)
     const quality = new URLSearchParams(location.search).get('graficos') === 'leve' ? 'low' : settings.graphics;
     this.renderer = new GameRenderer(this.canvas, level, this.sim.targets.targets, isTouchDevice(), quality);
-    this.currEye = this.prevEye = this.sim.player.eyePosition();
-    this.view = { yaw: level.spawnYaw, pitch: 0 };
+    this.resetView();
 
     const touch = isTouchDevice();
     if (touch) {
       document.body.classList.add('is-touch');
-      this.input.add(new TouchInput(this.uiRoot));
+      this.touch = new TouchInput(this.uiRoot);
+      this.input.add(this.touch);
     }
     // Teclado/mouse fica sempre ativo: tablets com teclado e PCs com tela touch
     this.keyboard = new KeyboardMouseInput(this.canvas);
@@ -100,6 +101,13 @@ export class Game {
       },
       onVolumeChange: (v) => this.sound.setVolume(v),
       onDifficultyChange: (d) => this.sim.setDifficulty(d),
+      onSideChange: (side) => {
+        this.sim.restartMatch(side);
+        this.sim.drainEvents();
+        this.hits = this.kills = 0;
+        this.input.clearLatched();
+        this.resetView();
+      },
     });
 
     const pause = () => {
@@ -155,10 +163,27 @@ export class Game {
       restartMatch() {
         game.sim.restartMatch();
       },
+      /** Só para testes automatizados: planta a bomba direto no ponto do site. */
+      plant(site: 'A' | 'B') {
+        const r = game.sim.rounds;
+        const s = game.sim.level.bombsites?.find((b) => b.id === site);
+        if (r && s?.plantSpot) r.debugPlant(site, { x: s.plantSpot[0], y: 0.05, z: s.plantSpot[1] });
+      },
+      get team() {
+        return game.sim.human.team;
+      },
       get running() {
         return game.running;
       },
     };
+  }
+
+  /** Câmera na posição e direção atuais do jogador (início e troca de lado). */
+  private resetView(): void {
+    this.view = { yaw: this.sim.human.controller.state.yaw, pitch: 0 };
+    this.currEye = this.prevEye = this.sim.player.eyePosition();
+    this.captureFeet();
+    this.prevFeet = new Map(this.currFeet);
   }
 
   private captureFeet(): void {
@@ -226,11 +251,14 @@ export class Game {
         break;
       }
       case 'roundEnd':
-        this.roundHud?.showRoundEnd(e.winner, e.reason);
+        this.roundHud?.showRoundEnd(e.winner, e.reason, this.sim.human.team);
         this.sound.roundEnd(e.winner === this.sim.human.team);
         break;
       case 'matchEnd':
-        if (this.sim.rounds) this.roundHud?.showMatchEnd(e.winner, this.sim.rounds.state);
+        if (this.sim.rounds) this.roundHud?.showMatchEnd(e.winner, this.sim.rounds.state, this.sim.human.team);
+        break;
+      case 'halftime':
+        this.roundHud?.showHalftime(this.sim.human.team);
         break;
       case 'reloadEnd':
       case 'roundStart':
@@ -276,6 +304,7 @@ export class Game {
     const speedNorm = clamp(Math.hypot(p.velocity.x, p.velocity.z) / MOVE.runSpeed, 0, 1);
 
     this.renderer.targets.update(dt, this.sim.targets.targets);
+    this.renderer.viewModel.setTeam(human.team);
     this.renderer.viewModel.setVisible(human.alive);
     this.renderer.viewModel.update(dt, w, speedNorm, p.grounded);
     // O recuo desloca a câmera junto com a mira dos tiros
@@ -296,14 +325,19 @@ export class Game {
     const rounds = this.sim.rounds;
     if (rounds) {
       const bomb = rounds.bomb;
-      const canPlant =
-        rounds.state.phase === 'live' &&
-        human.alive &&
-        bomb.status === 'carried' &&
-        bomb.carrier === human.id &&
-        !!inSite(rounds.bombsites, p.feet);
-      document.body.classList.toggle('can-plant', canPlant);
-      this.roundHud?.update(dt, rounds.state, bomb, this.sim.combatants(), human, canPlant);
+      const live = rounds.state.phase === 'live' && human.alive;
+      let action: BombAction = null;
+      if (live && bomb.status === 'carried' && bomb.carrier === human.id && inSite(rounds.bombsites, p.feet)) action = 'plant';
+      else if (
+        live &&
+        human.team === 'defense' &&
+        bomb.status === 'planted' &&
+        Math.hypot(p.feet.x - bomb.position.x, p.feet.z - bomb.position.z) < ROUND.defuseRange
+      )
+        action = 'defuse';
+      document.body.classList.toggle('can-use', action !== null);
+      this.touch?.setUseLabel(action === 'defuse' ? 'Desarmar' : 'Plantar');
+      this.roundHud?.update(dt, rounds.state, bomb, this.sim.combatants(), human, action);
       if (this.renderer.bomb.update(dt, bomb)) this.sound.beep();
     }
     this.debug?.update(dt, this.renderer.engine, p, this.instrumentation?.drawCallsCounter.current ?? 0);

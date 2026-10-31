@@ -47,6 +47,8 @@ export interface RoundHost {
   kill(c: Combatant): void;
   /** Reposiciona todos para uma nova rodada. */
   resetPositions(): void;
+  /** Intervalo: cada combatente passa para o outro lado. */
+  swapSides(): void;
 }
 
 export function inSite(sites: readonly Bombsite[], p: Vec3): Bombsite | undefined {
@@ -211,6 +213,7 @@ export class RoundSystem {
     if (st.phase === 'over') {
       if (st.timeLeft <= 0) {
         st.round++;
+        if (st.round === ROUND.halftimeAfterRound + 1) this.halftime();
         this.startRound();
       }
       return;
@@ -263,6 +266,17 @@ export class RoundSystem {
     } else if (this.teamSize.attack > 0 && !alive('attack') && bomb.status !== 'planted') {
       this.endRound('defense', 'elimination');
     }
+  }
+
+  /**
+   * Troca de lado. O placar é por lado, então os valores trocam junto: cada
+   * time leva as vitórias que já tinha.
+   */
+  private halftime(): void {
+    this.host.swapSides();
+    const s = this.state.score;
+    this.state.score = { attack: s.defense, defense: s.attack };
+    this.events.push({ type: 'halftime' });
   }
 
   private explode(all: Combatant[]): void {

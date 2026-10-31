@@ -47,6 +47,7 @@ const MUZZLE = new Vector3(0.1, -0.04, 0.86);
 type V3 = [number, number, number];
 
 interface View {
+  team: Team;
   root: TransformNode;
   fall: TransformNode;
   hips: TransformNode;
@@ -240,6 +241,7 @@ export class CombatantViews {
     blob.isPickable = false;
 
     const v: View = {
+      team: c.team,
       root,
       fall,
       hips,
@@ -285,6 +287,11 @@ export class CombatantViews {
     return m;
   }
 
+  private dispose(v: View): void {
+    v.root.dispose(false, false); // malhas filhas; materiais compartilhados ficam
+    v.material.dispose();
+  }
+
   onShot(id: EntityId): void {
     const v = this.views.get(id);
     if (v) v.muzzle = 0.06;
@@ -298,7 +305,13 @@ export class CombatantViews {
   /** @param feetOf posição interpolada dos pés de cada combatente */
   update(dt: number, list: readonly CombatantView[], feetOf: (id: EntityId) => Vec3): void {
     for (const c of list) {
-      const v = this.views.get(c.id) ?? this.create(c);
+      let v = this.views.get(c.id);
+      // Trocou de lado (intervalo): o uniforme e o equipamento mudam
+      if (v && v.team !== c.team) {
+        this.dispose(v);
+        v = undefined;
+      }
+      v ??= this.create(c);
       const f = feetOf(c.id);
       v.root.position.set(f.x, f.y, f.z);
       v.root.rotation.y = c.yaw;

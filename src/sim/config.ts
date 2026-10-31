@@ -94,6 +94,8 @@ export const ROUND = {
   pickupRange: 1.2,
   postRoundSeconds: 5,
   winsToMatch: 5,
+  /** Troca de lado depois desta rodada (como o intervalo do CS). */
+  halftimeAfterRound: 4,
   /** Explosão: letal até `lethalRadius`, dano cai a zero em `maxRadius`. */
   explosionLethalRadius: 8,
   explosionMaxRadius: 20,

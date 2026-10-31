@@ -2,7 +2,7 @@
 
 FPS tático 3D original para navegador, com foco em celular (touch, horizontal) e suporte a PC (teclado e mouse).
 
-**Estado atual:** Fase 5 — **modo bomba 3 contra 3** no mapa Galpão. Você e 2 aliados bots no ataque contra 3 bots da defesa; primeiro a 5 rodadas vence.
+**Estado atual:** **modo bomba 3 contra 3** no mapa Galpão. Você e 2 aliados bots contra 3 bots; escolha começar no ataque ou na defesa, e os times trocam de lado no intervalo. Primeiro a 5 rodadas vence.
 
 | Regra | Valor |
 |---|---|
@@ -12,6 +12,8 @@ FPS tático 3D original para navegador, com foco em celular (touch, horizontal) 
 | Ataque vence | elimina a defesa ou a bomba explode |
 | Defesa vence | elimina o ataque antes do plantio, tempo esgota ou desarma |
 | Morte | volta só na próxima rodada |
+| Troca de lado | depois da rodada 4 (o placar acompanha cada time) |
+| Dificuldade | vale para todos os bots, aliados e adversários |
 
 Parâmetros de URL: `?mapa=teste` (campo de treino com alvos e respawn), `?bots=0` (sem bots, para testar regras), `?graficos=leve` (força o modo leve).
 
@@ -47,6 +49,7 @@ npm run build    # typecheck + build de produção em dist/
 | Atirar | Clique esquerdo (segurar = automático) | **Atirar** (também mira enquanto pressionado) |
 | Recarregar | R | Botão **Recarregar** (ou automático ao atirar sem bala) |
 | Plantar | E (segurar) | Botão **Plantar** (aparece no site com a bomba) |
+| Desarmar | E (segurar) | Botão **Desarmar** (aparece perto da bomba plantada) |
 
 Ctrl não é usado para agachar porque Ctrl+W fecha a aba.
 
@@ -96,7 +99,9 @@ Regras que sustentam a evolução para multiplayer:
 3. ✅ Blockout do mapa Galpão: rotas validadas por teste (A ~11 s, B ~9,5 s, estreita ~9 s, defesa ~4 s)
 4. ✅ Bots: navegação A* em grade, visão por raycast (sem atravessar paredes), reação de 0,6 s, erro de mira que assenta, rajadas, audição de tiros, um bot de apoio por avistamento, anti-travamento
 5. ✅ Rodadas e bomba: plantar/desarmar/explodir, queda e coleta da bomba, aliados bots, desarme e retomada pela defesa, placar, fim de partida
-6. HUD final, menu e opções; troca de lado (jogar na defesa)
+6. HUD final, menu e opções
+   - ✅ Troca de lado: lado inicial no menu, intervalo após a rodada 4, desarme pelo jogador, HUD e avisos do ponto de vista do lado; dificuldade simétrica (com aliados mais fortes, a defesa vencia sozinha 15 de 16 rodadas)
+   - Menu principal e tela "como jogar"
 7. Arte (em andamento)
    - ✅ Mapa: texturas procedurais geradas no carregamento (concreto, chapa ondulada, madeira, contêiner em 3 cores, pilar com faixa de alerta, chapa xadrez, pintura do site) com normal map; UV em escala de mundo; sombras do sol estáticas (desenhadas uma vez); claraboias no galpão e no B; céu em degradê
    - ✅ Arma em primeira pessoa: fuzil original em partes (culatra, guarda-mão, trilho, mira de ponto vermelho, cano, quebra-chamas, carregador, coronha), mãos com luva e manga camuflada; câmera própria com FOV de 47° (proporção natural sem estreitar a visão); recarga em etapas (inclina, solta o pente, mão busca outro, encaixa); cápsulas ejetadas; clarão em estrela aditivo

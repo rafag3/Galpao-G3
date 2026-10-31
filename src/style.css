@@ -230,7 +230,7 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 
 /* Plantar: só aparece no site com a bomba */
 .btn-use { display: none; right: calc(210px + var(--safe-r)); bottom: calc(26px + var(--safe-b)); width: 84px; height: 84px; font-size: 13px; border-color: #ffb347; background: rgba(255, 179, 71, 0.35); }
-body.can-plant .btn-use { display: block; }
+body.can-use .btn-use { display: block; }
 .btn-use:active { background: rgba(255, 179, 71, 0.75); }
 
 /* Telas baixas (celular na horizontal com barra do navegador) */
@@ -382,4 +382,11 @@ body.menu-open :is(.round-board, .bomb-chip, .round-alert, .round-banner, .use-p
 .overlay.start { background: rgba(10, 12, 15, 0.86); }
 
 .difficulty.graphics { margin-left: 8px; }
+.difficulty.side { display: flex; width: fit-content; margin: 12px auto 0; }
+.difficulty.side button[data-s="attack"][aria-checked="true"] { background: rgba(230, 126, 34, 0.55); }
+/* Placar: o time do jogador ganha destaque */
+.round-board .team.mine { background: rgba(255, 255, 255, 0.14); }
+.round-board .team.mine .score::after { content: ' Você'; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); vertical-align: middle; }
+.round-board .team.def.mine .score::after { content: none; }
+.round-board .team.def.mine .score::before { content: 'Você '; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); vertical-align: middle; }
 .difficulty.graphics button { font-size: 12px; padding: 8px 12px; }

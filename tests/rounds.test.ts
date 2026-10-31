@@ -150,13 +150,18 @@ describe('rodadas', () => {
     expect(ev.find((e) => e.type === 'roundEnd')).toMatchObject({ winner: 'defense', reason: 'defused' });
   });
 
-  it('partida termina com 5 vitórias e pode recomeçar', () => {
+  it('partida termina com 5 vitórias, com troca de lado no intervalo, e pode recomeçar', () => {
+    // Sem bots, toda rodada acaba no tempo (vitória da defesa). Rodadas 1-4: o
+    // time vazio defende e faz 4; após o intervalo o jogador defende e faz 5.
     const sim = newSim({ bots: false });
     const perRound = ROUND.freezeSeconds + ROUND.roundSeconds + ROUND.postRoundSeconds;
-    const ev = runUntil(sim, (e) => e.type === 'matchEnd', perRound * 5 + 5);
+    const ev = runUntil(sim, (e) => e.type === 'matchEnd', perRound * 9 + 5);
+    expect(ev.filter((e) => e.type === 'halftime')).toHaveLength(1);
     expect(ev.find((e) => e.type === 'matchEnd')).toMatchObject({ winner: 'defense' });
-    expect(sim.rounds!.state).toMatchObject({ phase: 'matchOver', score: { attack: 0, defense: 5 } });
+    expect(sim.human.team).toBe('defense');
+    expect(sim.rounds!.state).toMatchObject({ phase: 'matchOver', round: 9, score: { attack: 4, defense: 5 } });
     sim.restartMatch();
+    expect(sim.human.team).toBe('attack');
     expect(sim.rounds!.state).toMatchObject({ phase: 'freeze', round: 1, score: { attack: 0, defense: 0 } });
   });
 
@@ -170,6 +175,69 @@ describe('rodadas', () => {
       run(sim, ROUND.postRoundSeconds + 0.1);
     }
     expect(rounds).toBe(3);
+  });
+});
+
+describe('troca de lado', () => {
+  const zoneHas = (zone: { min: [number, number]; max: [number, number] }, p: { x: number; z: number }) =>
+    p.x >= zone.min[0] && p.x <= zone.max[0] && p.z >= zone.min[1] && p.z <= zone.max[1];
+
+  it('começando na defesa: jogador nasce no spawn da defesa e um bot do ataque leva a bomba', () => {
+    const sim = newSim({ side: 'defense' });
+    expect(sim.human.team).toBe('defense');
+    expect(zoneHas(galpao.spawnZones!.defense, sim.player.state.feet)).toBe(true);
+    expect(sim.bots.filter((b) => b.combatant.team === 'defense')).toHaveLength(2);
+    expect(sim.bots.filter((b) => b.combatant.team === 'attack')).toHaveLength(3);
+    const carrier = sim.find(sim.rounds!.bomb.carrier!);
+    expect(carrier?.team).toBe('attack');
+    expect(carrier?.id.startsWith('bot:')).toBe(true);
+  });
+
+  it('jogador na defesa desarma a bomba segurando a ação perto dela', () => {
+    const sim = newSim({ side: 'defense', bots: false });
+    skipFreeze(sim);
+    sim.rounds!.debugPlant('A', siteSpot('A'));
+    sim.player.teleport(siteSpot('A'), 0);
+    run(sim, 0.3);
+    run(sim, 2, { use: true });
+    run(sim, 0.1); // soltou: progresso zera
+    expect(sim.rounds!.bomb.defuseProgress).toBe(0);
+    const ev = run(sim, ROUND.defuseSeconds + 0.1, { use: true });
+    expect(ev.find((e) => e.type === 'bombDefused')).toMatchObject({ by: 'player' });
+    expect(ev.find((e) => e.type === 'roundEnd')).toMatchObject({ winner: 'defense', reason: 'defused' });
+  });
+
+  it('no intervalo todos trocam de lado e o placar acompanha cada time', () => {
+    const sim = newSim();
+    const enemies = sim.bots.filter((b) => b.combatant.team === 'defense').map((b) => b.combatant);
+    for (let r = 1; r <= ROUND.halftimeAfterRound; r++) {
+      skipFreeze(sim);
+      // Rodadas 1-3 para o time do jogador, a 4ª para o adversário
+      if (r < ROUND.halftimeAfterRound) for (const c of enemies) sim.kill(c, sim.human);
+      else for (const c of sim.combatants().filter((c) => c.team === 'attack')) sim.kill(c, null);
+      run(sim, 0.1);
+      expect(sim.rounds!.state.phase).toBe('over');
+      run(sim, ROUND.postRoundSeconds);
+    }
+    expect(sim.rounds!.state.round).toBe(ROUND.halftimeAfterRound + 1);
+    expect(sim.human.team).toBe('defense');
+    expect(enemies.every((c) => c.team === 'attack')).toBe(true);
+    // Time do jogador: 3 vitórias, agora contadas na defesa
+    expect(sim.rounds!.state.score).toEqual({ attack: 1, defense: 3 });
+    expect(zoneHas(galpao.spawnZones!.defense, sim.player.state.feet)).toBe(true);
+    expect(sim.find(sim.rounds!.bomb.carrier!)?.team).toBe('attack');
+  });
+
+  it('bots do ataque levam a bomba ao site sozinhos', () => {
+    // Jogador sozinho na defesa, escondido no spawn; o ataque (3 bots) avança
+    const sim = newSim({ side: 'defense', allies: 0 });
+    skipFreeze(sim);
+    const ev = runUntil(sim, (e) => e.type === 'bombPlanted' || e.type === 'roundEnd', ROUND.roundSeconds);
+    const planted = ev.find((e) => e.type === 'bombPlanted');
+    const end = ev.find((e) => e.type === 'roundEnd');
+    // Ou plantam, ou acharam e eliminaram o jogador no caminho
+    expect(planted ?? end).toBeDefined();
+    if (!planted) expect(end).toMatchObject({ winner: 'attack', reason: 'elimination' });
   });
 });
 

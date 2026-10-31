@@ -32,15 +32,23 @@ export interface Bot {
 export interface SimOptions {
   /** false = sem nenhum bot. */
   bots?: boolean;
-  /** Aliados bots do jogador no ataque (padrão 2: partida 3x3). */
+  /** Aliados bots do jogador (padrão 2: partida 3x3). */
   allies?: number;
+  /** Lado em que o jogador humano começa (padrão: ataque). Troca no intervalo. */
+  side?: Team;
   /** false = desliga rodadas mesmo em mapa competitivo. */
   rounds?: boolean;
-  /** Dificuldade dos bots inimigos (padrão: normal). Aliados usam normal. */
+  /**
+   * Dificuldade de TODOS os bots, aliados e adversários (padrão: normal).
+   * Simétrica de propósito: com aliados mais fortes que os adversários, a
+   * defesa (que já espera posicionada) vencia sozinha 15 de 16 rodadas.
+   */
   difficulty?: Difficulty;
 }
 
 const emptyMemory = (): TeamMemory => ({ lastKnown: null, at: -99, spotter: null, responder: null });
+const other = (t: Team): Team => (t === 'attack' ? 'defense' : 'attack');
+const spawnYaw = (level: LevelData, t: Team) => (t === 'attack' ? level.spawnYaw : Math.PI);
 
 export class GameSim {
   readonly physics: PhysicsWorld;
@@ -56,6 +64,8 @@ export class GameSim {
   private teams: Record<Team, TeamMemory> = { attack: emptyMemory(), defense: emptyMemory() };
   private noises: Noise[] = [];
   private commanderTimer = 0;
+  /** Lado inicial do humano; volta a ele ao recomeçar a partida. */
+  private startSide: Team;
   tickCount = 0;
 
   /** Requer `await initPhysics()` antes. */
@@ -69,24 +79,31 @@ export class GameSim {
     this.nav = new NavGrid(level);
     this.targets = new TargetSystem(this.physics, level, this.hits, this.events);
 
-    this.human = this.createCombatant('player', 'attack', level.spawn, level.spawnYaw, COMBAT.playerHealth, COMBAT.playerRespawnSeconds);
+    const side = opts.side ?? 'attack';
+    this.startSide = side;
+    this.human = this.createCombatant('player', side, level.spawn, level.spawnYaw, COMBAT.playerHealth, COMBAT.playerRespawnSeconds);
 
+    // Dois times fixos (o do jogador e o adversário); o LADO de cada um troca
+    // no intervalo. Adversários: um por posto de defesa (3). Aliados: `allies`.
     const zones = level.spawnZones;
     if (opts.bots !== false && level.defensePosts && zones) {
       let n = 0;
+      const enemySide = other(side);
       level.defensePosts.forEach((post) => {
-        const c = this.createCombatant(`bot:${n}`, 'defense', this.spawnPoint(zones.defense, n, level.defensePosts!.length), Math.PI, COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
-        const brain = new BotBrain(objectiveFromPost(post), n, SKILLS[opts.difficulty ?? 'normal']);
-        brain.reset(Math.PI);
+        const c = this.createCombatant(`bot:${n}`, enemySide, this.spawnPoint(zones[enemySide], n, level.defensePosts!.length), spawnYaw(level, enemySide), COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
+        // Sem rodadas não há comandante: a defesa vai direto ao posto
+        const goal = enemySide === 'defense' ? objectiveFromPost(post) : { point: { x: c.respawnAt.x, z: c.respawnAt.z }, watchYaw: c.respawnYaw };
+        const brain = new BotBrain(goal, n, SKILLS[opts.difficulty ?? 'normal']);
+        brain.reset(c.respawnYaw);
         this.bots.push({ combatant: c, brain });
         n++;
       });
       const allies = opts.allies ?? 2;
       for (let i = 0; i < allies; i++) {
-        const spawn = this.spawnPoint(zones.attack, i + 1, allies + 1);
-        const c = this.createCombatant(`bot:${n}`, 'attack', spawn, 0, COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
-        const brain = new BotBrain({ point: { x: spawn.x, z: spawn.z }, watchYaw: 0 }, n);
-        brain.reset(0);
+        const spawn = this.spawnPoint(zones[side], i + 1, allies + 1);
+        const c = this.createCombatant(`bot:${n}`, side, spawn, spawnYaw(level, side), COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
+        const brain = new BotBrain({ point: { x: spawn.x, z: spawn.z }, watchYaw: c.respawnYaw }, n, SKILLS[opts.difficulty ?? 'normal']);
+        brain.reset(c.respawnYaw);
         this.bots.push({ combatant: c, brain });
         n++;
       }
@@ -96,9 +113,14 @@ export class GameSim {
       this.commander = new TeamCommander(level, this.nav);
       this.rounds = new RoundSystem(
         level,
-        { combatants: () => this.combatants(), kill: (c) => this.kill(c, null), resetPositions: () => this.resetPositions() },
+        {
+          combatants: () => this.combatants(),
+          kill: (c) => this.kill(c, null),
+          resetPositions: () => this.resetPositions(),
+          swapSides: () => this.swapSides(),
+        },
         this.events,
-        () => this.human.id,
+        () => this.bombCarrier(),
       );
       this.rounds.startRound();
       this.commander.onRoundStart(this.rng);
@@ -208,34 +230,55 @@ export class GameSim {
     this.events.push({ type: 'respawn', id: c.id });
   }
 
+  /** Quem começa a rodada com a bomba: o humano no ataque, senão um bot do ataque. */
+  private bombCarrier(): EntityId | null {
+    if (this.human.team === 'attack') return this.human.id;
+    const attackers = this.bots.filter((b) => b.combatant.team === 'attack');
+    if (!attackers.length) return null;
+    return attackers[Math.floor(this.rng.next() * attackers.length)].combatant.id;
+  }
+
+  /** Intervalo: todos passam para o outro lado. */
+  private swapSides(): void {
+    for (const c of this.combatants()) {
+      c.team = other(c.team);
+      c.respawnYaw = spawnYaw(this.level, c.team);
+    }
+  }
+
   /** Início de rodada: cada equipe na sua zona, vida e munição cheias. */
   private resetPositions(): void {
     const zones = this.level.spawnZones!;
     for (const team of ['attack', 'defense'] as const) {
       const members = this.combatants().filter((c) => c.team === team);
-      // O humano fica no centro (level.spawn); os bots ocupam as vagas em volta
+      // O humano fica no centro; os bots ocupam as vagas em volta
       const bots = members.filter((c) => c !== this.human);
       const slots = members.length;
       const middle = Math.floor(slots / 2);
       const free = Array.from({ length: slots }, (_, k) => k).filter((k) => !members.includes(this.human) || k !== middle);
       members.forEach((c) => {
-        const at = c === this.human ? this.level.spawn : this.spawnPoint(zones[team], free[bots.indexOf(c)], slots);
-        const yaw = team === 'attack' ? this.level.spawnYaw : Math.PI;
-        this.revive(c, at, yaw);
+        const at = this.spawnPoint(zones[team], c === this.human ? middle : free[bots.indexOf(c)], slots);
+        c.respawnAt = { ...at };
+        this.revive(c, at, spawnYaw(this.level, team));
         c.weapon.refill();
       });
     }
     this.teams = { attack: emptyMemory(), defense: emptyMemory() };
   }
 
-  /** Dificuldade dos bots adversários do jogador humano. */
+  /** Dificuldade de todos os bots (ver `SimOptions.difficulty`). */
   setDifficulty(d: Difficulty): void {
-    for (const b of this.bots) if (b.combatant.team !== this.human.team) b.brain.skill = SKILLS[d];
+    for (const b of this.bots) b.brain.skill = SKILLS[d];
   }
 
-  /** Recomeça a partida (botão "Jogar de novo"). */
-  restartMatch(): void {
+  /**
+   * Recomeça a partida (botão "Jogar de novo" ou troca de lado no menu).
+   * @param side lado inicial do jogador; omitido mantém o da partida anterior
+   */
+  restartMatch(side: Team = this.startSide): void {
     if (!this.rounds) return;
+    this.startSide = side;
+    if (this.human.team !== side) this.swapSides();
     for (const c of this.combatants()) {
       c.kills = 0;
       c.deaths = 0;

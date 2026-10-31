@@ -29,6 +29,7 @@ export class TouchInput implements InputSource {
   private pressed: PressedActions = noPressed();
   private crouchToggled = false;
   private useHeld = false;
+  private readonly useBtn: HTMLButtonElement;
 
   constructor(parent: HTMLElement) {
     const opts = { signal: this.abort.signal };
@@ -45,6 +46,7 @@ export class TouchInput implements InputSource {
     const reloadBtn = button('touch-btn btn-reload', 'Recarregar');
     const jumpBtn = button('touch-btn btn-jump', 'Pular');
     const useBtn = button('touch-btn btn-use', 'Plantar');
+    this.useBtn = useBtn;
     const crouchBtn = button('touch-btn btn-crouch', 'Agachar');
 
     this.root.append(moveZone, lookZone, fireBtn, reloadBtn, jumpBtn, crouchBtn, useBtn);
@@ -195,6 +197,11 @@ export class TouchInput implements InputSource {
     const p = this.pressed;
     this.pressed = noPressed();
     return p;
+  }
+
+  /** Rótulo do botão de ação: "Plantar" no ataque, "Desarmar" na defesa. */
+  setUseLabel(label: string): void {
+    if (this.useBtn.textContent !== label) this.useBtn.textContent = label;
   }
 
   dispose(): void {

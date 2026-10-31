@@ -3,7 +3,8 @@
 //
 // Defesa: cada um no seu posto; bomba plantada → o mais próximo desarma e
 //         os outros retomam o site.
-// Ataque: aliados vão ao site escolhido (o mais próximo do jogador humano);
+// Ataque: bots vão ao site escolhido (sorteado; com o humano no ataque, segue
+//         o site para onde ele vai);
 //         bomba caída → o mais próximo busca; portador bot → planta;
 //         bomba plantada → protegem em volta dela.
 
@@ -91,9 +92,12 @@ export class TeamCommander {
         }
       });
     } else {
+      // Posto fixo pela ordem entre TODOS os bots da defesa (vivos ou não):
+      // uma morte não remaneja os outros. Com o humano na defesa, os bots
+      // ficam com os primeiros postos (A e B) e o humano cobre o resto.
+      const allDefense = bots.filter((b) => b.combatant.team === 'defense');
       defense.forEach((b) => {
-        const idx = Number(b.combatant.id.split(':')[1]);
-        const post = posts[idx % Math.max(1, posts.length)];
+        const post = posts[allDefense.indexOf(b) % Math.max(1, posts.length)];
         if (post) b.brain.setObjective(objectiveFromPost(post));
       });
     }
@@ -101,8 +105,8 @@ export class TeamCommander {
     // ---------------------------------------------------------- ataque
     if (!attack.length || !sites.length) return;
 
-    // O site segue o jogador humano quando ele se afasta do spawn
-    if (human?.alive) {
+    // O site segue o jogador humano (no ataque) quando ele se afasta do spawn
+    if (human?.alive && human.team === 'attack') {
       const hp = flat(human.controller.state.feet);
       if (dist(hp, this.attackCenter) > 15) {
         let best = this.targetSite;

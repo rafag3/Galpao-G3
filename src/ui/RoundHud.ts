@@ -1,7 +1,7 @@
 // HUD da rodada: placar, cronômetro, vivos por equipe, estado da bomba,
 // progresso de plantio, avisos, resultado da rodada e fim de partida.
 
-import type { Combatant } from '../sim/Combatant';
+import type { Combatant, Team } from '../sim/Combatant';
 import { ROUND } from '../sim/config';
 import type { RoundEndReason } from '../sim/events';
 import type { BombState, RoundState } from '../sim/RoundSystem';
@@ -12,6 +12,11 @@ const REASON: Record<RoundEndReason, string> = {
   defused: 'bomba desarmada',
   time: 'tempo esgotado',
 };
+
+const SIDE: Record<Team, string> = { attack: 'Ataque', defense: 'Defesa' };
+
+/** O que o jogador pode fazer agora com a bomba. */
+export type BombAction = 'plant' | 'defuse' | null;
 
 const mmss = (s: number) => {
   const t = Math.max(0, Math.ceil(s));
@@ -27,6 +32,8 @@ function div(className: string, parent?: HTMLElement): HTMLDivElement {
 
 export class RoundHud {
   private readonly board: HTMLDivElement;
+  private readonly atk: HTMLDivElement;
+  private readonly def: HTMLDivElement;
   private readonly atkScore: HTMLSpanElement;
   private readonly defScore: HTMLSpanElement;
   private readonly clock: HTMLDivElement;
@@ -46,13 +53,13 @@ export class RoundHud {
 
   constructor(parent: HTMLElement, onRestart: () => void) {
     this.board = div('round-board', parent);
-    const atk = div('team atk', this.board);
+    const atk = (this.atk = div('team atk', this.board));
     this.atkScore = document.createElement('span');
     this.atkScore.className = 'score';
     this.atkAlive = div('alive', atk);
     atk.prepend(this.atkScore);
     this.clock = div('clock', this.board);
-    const def = div('team def', this.board);
+    const def = (this.def = div('team def', this.board));
     this.defScore = document.createElement('span');
     this.defScore.className = 'score';
     this.defAlive = div('alive', def);
@@ -78,17 +85,24 @@ export class RoundHud {
     });
   }
 
-  showRoundEnd(winner: 'attack' | 'defense', reason: RoundEndReason): void {
-    const won = winner === 'attack'; // o jogador está sempre no ataque, por enquanto
+  showRoundEnd(winner: Team, reason: RoundEndReason, mine: Team): void {
+    const won = winner === mine;
     this.banner.className = `round-banner show ${won ? 'win' : 'loss'}`;
-    this.banner.textContent = `${won ? 'Ataque vence' : 'Defesa vence'} · ${REASON[reason]}`;
+    this.banner.textContent = `${SIDE[winner]} vence · ${REASON[reason]}`;
     this.bannerTimer = ROUND.postRoundSeconds - 0.5;
   }
 
-  showMatchEnd(winner: 'attack' | 'defense', state: RoundState): void {
-    const won = winner === 'attack';
-    this.matchScreen.querySelector('h1')!.textContent = won ? 'Vitória' : 'Derrota';
-    this.matchScreen.querySelector('.phase')!.textContent = `Ataque ${state.score.attack} × ${state.score.defense} Defesa`;
+  /** Intervalo: avisa o novo lado do jogador. */
+  showHalftime(mine: Team): void {
+    this.banner.className = 'round-banner show';
+    this.banner.textContent = `Troca de lado · agora você está na ${SIDE[mine].toLowerCase()}`;
+    this.bannerTimer = ROUND.freezeSeconds + 0.5;
+  }
+
+  showMatchEnd(winner: Team, state: RoundState, mine: Team): void {
+    const enemy: Team = mine === 'attack' ? 'defense' : 'attack';
+    this.matchScreen.querySelector('h1')!.textContent = winner === mine ? 'Vitória' : 'Derrota';
+    this.matchScreen.querySelector('.phase')!.textContent = `Seu time ${state.score[mine]} × ${state.score[enemy]} Adversários`;
     this.matchScreen.classList.remove('hidden');
   }
 
@@ -96,15 +110,19 @@ export class RoundHud {
     this.flashTimer = 0.9;
   }
 
-  update(dt: number, state: RoundState, bomb: BombState, all: readonly Combatant[], human: Combatant, canPlant: boolean): void {
+  update(dt: number, state: RoundState, bomb: BombState, all: readonly Combatant[], human: Combatant, action: BombAction): void {
+    const mine = human.team;
+    const canPlant = action === 'plant';
     // Placar e vivos: só reescreve o DOM quando algo muda
     const alive = (t: 'attack' | 'defense') =>
       all
         .filter((c) => c.team === t)
         .map((c) => (c.alive ? '●' : '○'))
         .join('');
-    const key = `${state.score.attack}|${state.score.defense}|${alive('attack')}|${alive('defense')}`;
+    const key = `${state.score.attack}|${state.score.defense}|${alive('attack')}|${alive('defense')}|${mine}`;
     if (key !== this.lastKey) {
+      this.atk.classList.toggle('mine', mine === 'attack');
+      this.def.classList.toggle('mine', mine === 'defense');
       this.atkScore.textContent = String(state.score.attack);
       this.defScore.textContent = String(state.score.defense);
       this.atkAlive.textContent = alive('attack');
@@ -120,26 +138,37 @@ export class RoundHud {
     else this.clock.textContent = 'Fim da rodada';
 
     const carrying = bomb.status === 'carried' && bomb.carrier === human.id && human.alive;
-    this.carrier.classList.toggle('show', carrying && state.phase !== 'over');
-    this.carrier.classList.toggle('in-site', canPlant);
-    this.carrier.textContent = canPlant ? 'No site: segure Plantar' : 'Você está com a bomba';
+    const live = state.phase === 'live' || state.phase === 'freeze';
+    this.carrier.classList.toggle('show', live && (carrying || action === 'defuse'));
+    this.carrier.classList.toggle('in-site', action !== null);
+    this.carrier.textContent =
+      action === 'defuse' ? 'Na bomba: segure Desarmar' : canPlant ? 'No site: segure Plantar' : 'Você está com a bomba';
 
-    // Barra de progresso: plantio do jogador
+    // Barra de progresso: plantio ou desarme do jogador
     const planting = carrying && bomb.plantProgress > 0;
-    this.progress.classList.toggle('show', planting);
-    if (planting) {
-      this.progressLabel.textContent = 'Plantando…';
-      this.progressFill.style.transform = `scaleX(${bomb.plantProgress})`;
+    const defusing = planted && bomb.defuser === human.id && bomb.defuseProgress > 0;
+    this.progress.classList.toggle('show', planting || defusing);
+    if (planting || defusing) {
+      this.progressLabel.textContent = planting ? 'Plantando…' : 'Desarmando…';
+      this.progressFill.style.transform = `scaleX(${planting ? bomb.plantProgress : bomb.defuseProgress})`;
     }
 
-    // Avisos
+    // Avisos, do ponto de vista do lado do jogador
+    const attacking = mine === 'attack';
     let alert = '';
-    if (state.phase === 'freeze' && state.round === 1) alert = 'Plante a bomba no A ou no B';
-    else if (planted && bomb.defuser) alert = 'A defesa está desarmando!';
-    else if (bomb.status === 'dropped') alert = 'Bomba caída: um aliado vai buscar';
+    let danger = false;
+    if (state.phase === 'freeze' && (state.round === 1 || state.round === ROUND.halftimeAfterRound + 1))
+      alert = attacking ? 'Plante a bomba no A ou no B' : 'Defenda os sites A e B';
+    else if (planted && bomb.defuser && bomb.defuser !== human.id) {
+      alert = attacking ? 'A defesa está desarmando!' : 'Um aliado está desarmando';
+      danger = attacking;
+    } else if (planted && !attacking && !bomb.defuser) {
+      alert = `Bomba plantada no ${bomb.site}: desarme!`;
+      danger = true;
+    } else if (bomb.status === 'dropped') alert = attacking ? 'Bomba caída: um aliado vai buscar' : 'O ataque deixou a bomba cair';
     this.alert.textContent = alert;
     this.alert.classList.toggle('show', !!alert);
-    this.alert.classList.toggle('danger', planted && !!bomb.defuser);
+    this.alert.classList.toggle('danger', danger);
 
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;

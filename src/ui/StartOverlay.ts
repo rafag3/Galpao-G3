@@ -3,7 +3,8 @@
 // cheia, trava de orientação, pointer lock e áudio.
 
 import { saveSettings, settings } from '../core/Settings';
-import type { Difficulty } from '../sim/config';
+import type { Team } from '../sim/Combatant';
+import { type Difficulty, ROUND } from '../sim/config';
 
 const LEVELS: [Difficulty, string][] = [
   ['easy', 'Fácil'],
@@ -16,6 +17,8 @@ export interface StartOptions {
   onStart: () => void;
   onVolumeChange: (v: number) => void;
   onDifficultyChange: (d: Difficulty) => void;
+  /** Lado inicial mudou: recomeça a partida. */
+  onSideChange: (side: Team) => void;
 }
 
 export class StartOverlay {
@@ -28,8 +31,12 @@ export class StartOverlay {
     this.root.innerHTML = `
       <div class="start-card">
         <h1>Galpão G3</h1>
-        <p class="phase">Modo bomba · 3 contra 3</p>
+        <p class="phase">Modo bomba · 3 contra 3 · troca de lado na rodada ${ROUND.halftimeAfterRound + 1}</p>
         <button type="button" class="start-btn">Jogar</button>
+        <div class="difficulty side" role="radiogroup" aria-label="Lado inicial">
+          <button type="button" role="radio" data-s="attack" aria-checked="${settings.side === 'attack'}">Começar no ataque</button>
+          <button type="button" role="radio" data-s="defense" aria-checked="${settings.side === 'defense'}">Começar na defesa</button>
+        </div>
         <div class="difficulty" role="radiogroup" aria-label="Dificuldade">
           ${LEVELS.map(([id, label]) => `<button type="button" role="radio" data-d="${id}" aria-checked="${settings.difficulty === id}">${label}</button>`).join('')}
         </div>
@@ -50,7 +57,7 @@ export class StartOverlay {
         <p class="hint">${
           opts.isTouch
             ? 'Polegar esquerdo move (no limite corre). Arraste à direita para mirar. O botão Atirar também mira enquanto pressionado.'
-            : 'WASD move · Shift corre · Espaço pula · C agacha · Clique atira · R recarrega · E (segurar) planta · Esc pausa'
+            : 'WASD move · Shift corre · Espaço pula · C agacha · Clique atira · R recarrega · E (segurar) planta ou desarma · Esc pausa'
         }</p>
       </div>`;
     parent.append(this.root);
@@ -58,13 +65,27 @@ export class StartOverlay {
 
     this.root.querySelector('.start-btn')!.addEventListener('click', () => this.start());
 
-    const diffButtons = this.root.querySelectorAll<HTMLButtonElement>('.difficulty button');
+    const diffButtons = this.root.querySelectorAll<HTMLButtonElement>('.difficulty button[data-d]');
     diffButtons.forEach((b) =>
       b.addEventListener('click', () => {
         settings.difficulty = b.dataset.d as Difficulty;
         saveSettings();
         diffButtons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
         opts.onDifficultyChange(settings.difficulty);
+      }),
+    );
+
+    // Lado: recomeça a partida (no menu de pausa, avisa no texto do botão)
+    const sideButtons = this.root.querySelectorAll<HTMLButtonElement>('.side button');
+    sideButtons.forEach((b) =>
+      b.addEventListener('click', () => {
+        const side = b.dataset.s as Team;
+        if (side === settings.side) return;
+        settings.side = side;
+        saveSettings();
+        sideButtons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        opts.onSideChange(side);
+        this.root.querySelector('.start-btn')!.textContent = 'Jogar';
       }),
     );
 

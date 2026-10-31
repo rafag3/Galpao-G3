@@ -58,6 +58,8 @@ export class ViewModel {
   private nextShell = 0;
   private kick = 0;
   private flashTimer = 0;
+  private sleeve!: StandardMaterial;
+  private team: Team;
   private bobPhase = 0;
   private time = 0;
 
@@ -73,6 +75,8 @@ export class ViewModel {
     const rail = this.material('vm-rail', W.rail(), 0.3);
     const glove = this.material('vm-glove', W.glove(), 0.05);
     const sleeve = this.material('vm-sleeve', team === 'attack' ? W.sleeveAttack() : W.sleeveDefense(), 0.03);
+    this.sleeve = sleeve;
+    this.team = team;
 
     // ---- Fuzil (eixo +Z = cano). Medidas em metros.
     this.group(this.gun, polymer, [
@@ -148,6 +152,16 @@ export class ViewModel {
   }
 
   // ------------------------------------------------------------ construção
+
+  /** Troca a manga do uniforme (intervalo ou lado escolhido no menu). */
+  setTeam(team: Team): void {
+    if (team === this.team) return;
+    this.team = team;
+    const old = this.sleeve;
+    this.sleeve = this.material('vm-sleeve', team === 'attack' ? W.sleeveAttack() : W.sleeveDefense(), 0.03);
+    for (const m of this.scene.meshes) if (m.material === old) m.material = this.sleeve;
+    old.dispose(true, true);
+  }
 
   private material(name: string, pair: TexturePair, specular: number): StandardMaterial {
     const tex = (n: string, c: HTMLCanvasElement) => {
