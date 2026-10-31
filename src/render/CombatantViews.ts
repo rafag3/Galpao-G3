@@ -27,6 +27,7 @@ import type { CombatantView, Team } from '../sim/Combatant';
 import type { EntityId } from '../sim/events';
 import { approach, type Vec3 } from '../sim/math';
 import { remapUV, roundedBox } from './art/Shapes';
+import { GlbSoldiers } from './GlbSoldiers';
 import { buildAtlas, cellUV, type AtlasCell } from './art/SoldierAtlas';
 
 /** Medidas do corpo (m). Somadas batem com a cápsula da simulação (1,8 m). */
@@ -124,11 +125,32 @@ export class CombatantViews {
   private flashMat: StandardMaterial | null = null;
   private blobMat: StandardMaterial | null = null;
 
+  /** Soldados animados de .glb; enquanto não carregam (ou se falharem), valem os de código. */
+  private readonly glb: GlbSoldiers;
+
   /** @param relief normal map no uniforme (desligado no modo Leve) */
   constructor(
     private readonly scene: Scene,
     private readonly relief = true,
-  ) {}
+  ) {
+    this.glb = new GlbSoldiers(
+      scene,
+      (id) => this.makeFlash(id),
+      (id, parent) => this.makeBlob(id, parent),
+    );
+  }
+
+  /** Carrega os soldados .glb. Falha (sem rede, arquivo ausente) mantém os de código. */
+  async loadModels(): Promise<void> {
+    try {
+      await this.glb.load();
+      // Os de código criados antes do carregamento saem de cena
+      for (const v of this.views.values()) this.dispose(v);
+      this.views.clear();
+    } catch (err) {
+      console.warn('Modelos de soldado indisponíveis; usando os soldados feitos por código.', err);
+    }
+  }
 
   private atlasFor(team: Team): { color: DynamicTexture; normal: DynamicTexture } {
     let t = this.atlas.get(team);
@@ -251,26 +273,10 @@ export class CombatantViews {
     }
 
     // Clarão do tiro na ponta do cano
-    if (!this.flashMat) {
-      this.flashMat = new StandardMaterial('sold-flash', scene);
-      this.flashMat.emissiveColor = Color3.FromHexString('#ffd27a');
-      this.flashMat.disableLighting = true;
-    }
-    const flash = CreateBox(`sold-flash-${c.id}`, { size: 0.16 }, scene);
-    flash.material = this.flashMat;
+    const flash = this.makeFlash(c.id);
     flash.parent = aim;
     flash.position.copyFrom(MUZZLE);
-    flash.rotation.z = Math.PI / 4;
-    flash.isPickable = false;
-    flash.isVisible = false;
-
-    // Sombra de contato: as sombras do sol são estáticas (desenhadas uma vez),
-    // então um disco escuro sob os pés "assenta" o soldado no chão.
-    const blob = CreateGround(`sold-blob-${c.id}`, { width: 1.1, height: 1.1 }, scene);
-    blob.parent = root;
-    blob.position.y = 0.015;
-    blob.material = this.blobMaterial();
-    blob.isPickable = false;
+    this.makeBlob(c.id, root);
 
     const v: View = {
       team: c.team,
@@ -294,6 +300,33 @@ export class CombatantViews {
     };
     this.views.set(c.id, v);
     return v;
+  }
+
+  /** Clarão do tiro (cubo girado, emissivo, escondido até atirar). */
+  private makeFlash(id: EntityId): Mesh {
+    if (!this.flashMat) {
+      this.flashMat = new StandardMaterial('sold-flash', this.scene);
+      this.flashMat.emissiveColor = Color3.FromHexString('#ffd27a');
+      this.flashMat.disableLighting = true;
+    }
+    const flash = CreateBox(`sold-flash-${id}`, { size: 0.16 }, this.scene);
+    flash.material = this.flashMat;
+    flash.rotation.z = Math.PI / 4;
+    flash.isPickable = false;
+    flash.isVisible = false;
+    return flash;
+  }
+
+  /**
+   * Sombra de contato: as sombras do sol são estáticas (desenhadas uma vez),
+   * então um disco escuro sob os pés "assenta" o soldado no chão.
+   */
+  private makeBlob(id: EntityId, parent: TransformNode): void {
+    const blob = CreateGround(`sold-blob-${id}`, { width: 1.1, height: 1.1 }, this.scene);
+    blob.parent = parent;
+    blob.position.y = 0.015;
+    blob.material = this.blobMaterial();
+    blob.isPickable = false;
   }
 
   private blobMaterial(): StandardMaterial {
@@ -325,17 +358,23 @@ export class CombatantViews {
   }
 
   onShot(id: EntityId): void {
+    this.glb.onShot(id);
     const v = this.views.get(id);
     if (v) v.muzzle = 0.06;
   }
 
   onHit(id: EntityId): void {
+    this.glb.onHit(id);
     const v = this.views.get(id);
     if (v) v.hitFlash = 1;
   }
 
   /** @param feetOf posição interpolada dos pés de cada combatente */
   update(dt: number, list: readonly CombatantView[], feetOf: (id: EntityId) => Vec3): void {
+    if (this.glb.ready) {
+      this.glb.update(dt, list, feetOf);
+      return;
+    }
     for (const c of list) {
       let v = this.views.get(c.id);
       // Trocou de lado (intervalo): o uniforme e o equipamento mudam

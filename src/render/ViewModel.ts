@@ -21,6 +21,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import type { Team } from '../sim/Combatant';
 import type { WeaponState } from '../sim/WeaponController';
 import type { TexturePair } from './art/ProceduralTextures';
+import { loadModel } from './art/Models';
 import { roundedBox } from './art/Shapes';
 import * as W from './art/WeaponTextures';
 
@@ -34,6 +35,19 @@ const BASE_YAW = -0.09;
 const BASE_PITCH = 0.01;
 const MAG_POS = new Vector3(0, -0.085, 0.075);
 const LEFT_HAND_POS = new Vector3(-0.005, -0.045, 0.3);
+/**
+ * Onde fica a origem dos modelos .glb (ponto da empunhadura, convenção do
+ * Tiny Strike) no espaço da arma: o cano fica ~2 cm abaixo da linha de base
+ * e a empunhadura onde a mão direita já está.
+ */
+const GLB_ORIGIN = new Vector3(0, -0.043, -0.09);
+/** Mão esquerda sob o guarda-mão dos modelos .glb (guarda-mão 15 cm acima da empunhadura). */
+const GLB_LEFT_HAND = new Vector3(-0.002, 0.1, 0.27);
+/**
+ * Posição da arma .glb em relação à câmera: mais baixa e mais longe que o
+ * fuzil de código, porque o modelo tem o cano bem acima da empunhadura.
+ */
+const GLB_BASE = new Vector3(0.15, -0.27, 0.5);
 const MUZZLE_Z = 0.66;
 
 const smooth = (a: number, b: number, t: number) => {
@@ -53,6 +67,16 @@ export class ViewModel {
   private readonly root: TransformNode;
   private readonly gun: TransformNode;
   private readonly mag: Mesh;
+  private readonly procGun: TransformNode;
+  /** Armas carregadas de .glb, por lado (TR: AK, CT: M4). */
+  private readonly models = new Map<Team, TransformNode>();
+  private readonly muzzles = new Map<Team, Vector3>();
+  /** Posição de descanso da mão esquerda (muda com o modelo da arma). */
+  private leftBase = LEFT_HAND_POS.clone();
+  /** Posição de descanso da arma em relação à câmera. */
+  private base = BASE.clone();
+  /** De onde saem as cápsulas (janela de ejeção, à direita da culatra). */
+  private shellOrigin = new Vector3(0.035, 0.02, 0.06);
   private readonly leftHand: TransformNode;
   private readonly flash: Mesh;
   private readonly shells: Shell[] = [];
@@ -67,7 +91,7 @@ export class ViewModel {
   constructor(private readonly scene: Scene, camera: FreeCamera, team: Team = 'attack') {
     this.root = new TransformNode('vm-root', scene);
     this.root.parent = camera;
-    this.root.position.copyFrom(BASE);
+    this.root.position.copyFrom(this.base);
     this.gun = new TransformNode('vm-gun', scene);
     this.gun.parent = this.root;
 
@@ -81,7 +105,10 @@ export class ViewModel {
 
     // ---- Fuzil (eixo +Z = cano). Medidas em metros. Peças com quinas
     // arredondadas: o reflexo corre pelas bordas como em peça moldada/usinada.
-    this.group(this.gun, polymer, [
+    // Fuzil feito por código: reserva caso o modelo .glb não carregue
+    const proc = (this.procGun = new TransformNode('vm-proc', scene));
+    proc.parent = this.gun;
+    this.group(proc, polymer, [
       [0.054, 0.064, 0.25, 0, -0.012, 0.31], // guarda-mão
       [0.042, 0.064, 0.15, 0, -0.016, -0.25], // coronha
       [0.048, 0.092, 0.032, 0, -0.022, -0.335], // soleira
@@ -92,11 +119,15 @@ export class ViewModel {
     grip.parent = this.gun;
     grip.position.set(0, -0.085, -0.075);
     grip.rotation.x = -0.35;
-    this.group(grip, polymer, [
+    const procGrip = new TransformNode('vm-proc-grip', scene);
+    procGrip.parent = proc;
+    procGrip.position.copyFrom(grip.position);
+    procGrip.rotation.copyFrom(grip.rotation);
+    this.group(procGrip, polymer, [
       [0.038, 0.1, 0.048, 0, 0, 0], // empunhadura
       [0.042, 0.012, 0.054, 0, -0.051, 0.002], // base
     ]);
-    this.group(this.gun, metal, [
+    this.group(proc, metal, [
       [0.056, 0.064, 0.24, 0, 0, 0.02], // caixa da culatra
       [0.05, 0.03, 0.1, 0, -0.045, 0.06], // poço do carregador
       [0.012, 0.012, 0.03, 0.03, 0.02, -0.05], // alavanca de manejo
@@ -112,8 +143,8 @@ export class ViewModel {
     // Trilho superior com os dentes (picatinny)
     const rails: Part[] = [[0.026, 0.01, 0.42, 0, 0.036, 0.18], ...slots];
     for (let z = -0.02; z <= 0.39; z += 0.021) rails.push([0.029, 0.004, 0.008, 0, 0.042, z]);
-    this.group(this.gun, rail, rails);
-    this.cylinders(this.gun, metal, [
+    this.group(proc, rail, rails);
+    this.cylinders(proc, metal, [
       [0.017, 0.2, 0, 0, 0.53], // cano
       [0.028, 0.055, 0, 0, MUZZLE_Z - 0.03], // quebra-chamas
       [0.026, 0.03, 0, 0, 0.43], // bloco de gases
@@ -126,7 +157,7 @@ export class ViewModel {
     lens.position.set(0, 0.062, 0.0195);
     lens.rotation.y = Math.PI;
     lens.material = this.lensMaterial();
-    this.attach(lens, this.gun);
+    this.attach(lens, proc);
 
     // Carregador curvo em três gomos (animado na recarga como peça única)
     const segs = [0, 1, 2].map((i) => {
@@ -141,7 +172,7 @@ export class ViewModel {
     this.mag = Mesh.MergeMeshes([...segs, plate], true)!;
     this.mag.name = 'vm-mag';
     this.mag.material = metal;
-    this.attach(this.mag, this.gun);
+    this.attach(this.mag, proc);
 
     // ---- Mão direita fechada na empunhadura + antebraço (move com a arma)
     this.group(grip, glove, [
@@ -158,7 +189,7 @@ export class ViewModel {
     // ---- Mão esquerda segurando o guarda-mão por baixo (vai buscar o carregador)
     this.leftHand = new TransformNode('vm-left', scene);
     this.leftHand.parent = this.gun;
-    this.leftHand.position.copyFrom(LEFT_HAND_POS);
+    this.leftHand.position.copyFrom(this.leftBase);
     const fingers: Part[] = [[0.062, 0.024, 0.095, 0, -0.012, 0]]; // palma por baixo
     for (const z of [-0.03, -0.01, 0.01, 0.03]) fingers.push([0.017, 0.05, 0.017, 0.032, 0.016, z, 0, 0, -0.15]); // dedos subindo pela lateral
     fingers.push([0.018, 0.04, 0.055, -0.032, 0.012, 0.005, 0, 0, 0.2]); // polegar do outro lado
@@ -187,10 +218,55 @@ export class ViewModel {
 
   // ------------------------------------------------------------ construção
 
-  /** Troca a manga do uniforme (intervalo ou lado escolhido no menu). */
+  /**
+   * Carrega AK (TR) e M4 (CT) do Tiny Strike. Se falhar (sem rede, arquivo
+   * ausente), fica o fuzil feito por código: o jogo não depende dos arquivos.
+   */
+  async loadModels(): Promise<void> {
+    const files: [Team, string][] = [
+      ['attack', 'models/ak47.glb'],
+      ['defense', 'models/m4a1.glb'],
+    ];
+    try {
+      for (const [team, url] of files) {
+        const c = await loadModel(this.scene, url, {}, 0.1);
+        const slot = new TransformNode(`vm-glb-${team}`, this.scene);
+        slot.parent = this.gun;
+        slot.position.copyFrom(GLB_ORIGIN);
+        slot.rotation.y = Math.PI; // glTF aponta o cano para -Z; aqui o cano vai para +Z
+        const inst = c.instantiateModelsToScene((n) => `vm-${team}-${n}`, false, { doNotInstantiate: true });
+        for (const r of inst.rootNodes) r.parent = slot;
+        for (const m of slot.getChildMeshes()) this.attach(m as Mesh, m.parent as TransformNode);
+        // Ponta do cano: nó "Muzzle" do arquivo (coordenadas glTF → espaço da arma)
+        const muzzle = slot.getDescendants(false).find((n) => n.name.endsWith('Muzzle')) as TransformNode | undefined;
+        const m = muzzle?.position ?? new Vector3(0, 0.19, -0.6);
+        this.muzzles.set(team, GLB_ORIGIN.add(new Vector3(m.x, m.y, -m.z)));
+        this.models.set(team, slot);
+      }
+      this.procGun.setEnabled(false);
+      this.leftBase = GLB_LEFT_HAND.clone();
+      this.base = GLB_BASE.clone();
+      // Janela de ejeção dos modelos: lado direito da culatra, na altura do cano
+      this.shellOrigin = GLB_ORIGIN.add(new Vector3(0.035, 0.16, 0.06));
+      this.leftHand.position.copyFrom(this.leftBase);
+      this.applyTeamGun();
+    } catch (err) {
+      console.warn('Modelos de arma indisponíveis; usando o fuzil feito por código.', err);
+    }
+  }
+
+  /** Mostra a arma do lado atual e põe o clarão na ponta do cano dela. */
+  private applyTeamGun(): void {
+    for (const [team, node] of this.models) node.setEnabled(team === this.team);
+    const tip = this.muzzles.get(this.team);
+    if (tip) this.flash.position.set(tip.x, tip.y, tip.z + 0.05);
+  }
+
+  /** Troca a manga do uniforme e a arma (intervalo ou lado escolhido no menu). */
   setTeam(team: Team): void {
     if (team === this.team) return;
     this.team = team;
+    this.applyTeamGun();
     const old = this.sleeve;
     this.sleeve = this.material('vm-sleeve', team === 'attack' ? W.sleeveAttack() : W.sleeveDefense(), 0.03);
     for (const m of this.scene.meshes) if (m.material === old) m.material = this.sleeve;
@@ -330,7 +406,7 @@ export class ViewModel {
     const s = this.shells[this.nextShell];
     this.nextShell = (this.nextShell + 1) % this.shells.length;
     s.mesh.setEnabled(true);
-    s.mesh.position.set(0.035, 0.02, 0.06);
+    s.mesh.position.copyFrom(this.shellOrigin);
     s.mesh.rotation.set(Math.random(), Math.random(), Math.PI / 2);
     s.vel.set(1.1 + Math.random() * 0.4, 0.9 + Math.random() * 0.4, -0.2 - Math.random() * 0.3);
     s.life = 0.7;
@@ -348,9 +424,9 @@ export class ViewModel {
     const bob = grounded ? speedNorm : 0;
     const breathe = Math.sin(this.time * 1.6) * 0.0025;
     this.root.position.set(
-      BASE.x + Math.sin(this.bobPhase) * 0.012 * bob,
-      BASE.y - Math.abs(Math.cos(this.bobPhase)) * 0.01 * bob + breathe,
-      BASE.z - 0.04 * this.kick,
+      this.base.x + Math.sin(this.bobPhase) * 0.012 * bob,
+      this.base.y - Math.abs(Math.cos(this.bobPhase)) * 0.01 * bob + breathe,
+      this.base.z - 0.04 * this.kick,
     );
     this.root.rotation.set(BASE_PITCH - 0.08 * this.kick, BASE_YAW + Math.sin(this.bobPhase) * 0.01 * bob, 0);
 
@@ -389,7 +465,7 @@ export class ViewModel {
     // Mão esquerda acompanha o pente entre soltar e encaixar
     const reach = smooth(0.1, 0.22, p) * (1 - smooth(0.7, 0.84, p));
     const target = new Vector3(MAG_POS.x - 0.01, this.mag.position.y - 0.05, MAG_POS.z - 0.01);
-    Vector3.LerpToRef(LEFT_HAND_POS, target, reach, this.leftHand.position);
+    Vector3.LerpToRef(this.leftBase, target, reach, this.leftHand.position);
     this.leftHand.rotation.set(0.6 * reach, 0, 0.4 * reach);
   }
 }

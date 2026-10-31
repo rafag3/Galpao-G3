@@ -69,6 +69,8 @@ export class Game {
     // ?graficos=leve força o modo leve (aparelhos fracos e testes automatizados)
     const quality = new URLSearchParams(location.search).get('graficos') === 'leve' ? 'low' : settings.graphics;
     this.renderer = new GameRenderer(this.canvas, level, this.sim.targets.targets, isTouchDevice(), quality);
+    // Soldados e armas em .glb (com reserva feita por código se não carregarem)
+    await Promise.all([this.renderer.combatants.loadModels(), this.renderer.viewModel.loadModels()]);
     this.resetView();
 
     const touch = isTouchDevice();
