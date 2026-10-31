@@ -10,11 +10,12 @@ export interface SettingsData {
   touchSensitivity: number;
   volume: number;
   difficulty: Difficulty;
+  graphics: 'high' | 'low';
 }
 
 const KEY = 'galpao.settings.v1';
 // Fácil por padrão: no touch o jogador reage mais devagar que no mouse
-const DEFAULTS: SettingsData = { mouseSensitivity: 1, touchSensitivity: 1, volume: 0.7, difficulty: 'easy' };
+const DEFAULTS: SettingsData = { mouseSensitivity: 1, touchSensitivity: 1, volume: 0.7, difficulty: 'easy', graphics: 'high' };
 
 function load(): SettingsData {
   try {
@@ -27,6 +28,7 @@ function load(): SettingsData {
       const v = parsed[k];
       if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
     }
+    if (parsed.graphics === 'high' || parsed.graphics === 'low') out.graphics = parsed.graphics;
     if (parsed.difficulty === 'easy' || parsed.difficulty === 'normal' || parsed.difficulty === 'hard') out.difficulty = parsed.difficulty;
     return out;
   } catch {

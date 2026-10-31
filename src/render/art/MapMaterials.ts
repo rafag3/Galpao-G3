@@ -46,7 +46,11 @@ export class MapMaterials {
   private readonly textures = new Map<() => T.TexturePair, T.TexturePair>();
   private readonly materials = new Map<MaterialKey, StandardMaterial>();
 
-  constructor(private readonly scene: Scene) {}
+  /** @param relief false = sem normal map (modo leve) */
+  constructor(
+    private readonly scene: Scene,
+    private readonly relief = true,
+  ) {}
 
   /** Variante determinística por posição (mesma caixa, mesma cor sempre). */
   static keyFor(b: Block): MaterialKey {
@@ -67,7 +71,7 @@ export class MapMaterials {
 
     const m = new StandardMaterial(`mat-${key}`, this.scene);
     m.diffuseTexture = this.toTexture(`${key}-c`, pair.color);
-    m.bumpTexture = this.toTexture(`${key}-n`, pair.normal);
+    if (this.relief) m.bumpTexture = this.toTexture(`${key}-n`, pair.normal);
     if (spec.tint) m.diffuseColor = Color3.FromHexString(spec.tint);
     const s = spec.specular ?? 0.05;
     m.specularColor = new Color3(s, s, s);

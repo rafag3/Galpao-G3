@@ -14,7 +14,7 @@ export interface TexturePair {
 // ------------------------------------------------------------------ ruído
 
 /** Hash inteiro → [0, 1). Determinístico: as texturas são sempre iguais. */
-function hash(x: number, y: number, seed: number): number {
+export function hash(x: number, y: number, seed: number): number {
   let h = (x * 374761393 + y * 668265263 + seed * 2147483647) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
@@ -37,7 +37,7 @@ function valueNoise(x: number, y: number, period: number, seed: number): number 
 }
 
 /** Fractal (soma de oitavas), em [0, 1]. u, v em [0, 1). */
-function fbm(u: number, v: number, basePeriod: number, octaves: number, seed: number): number {
+export function fbm(u: number, v: number, basePeriod: number, octaves: number, seed: number): number {
   let sum = 0;
   let amp = 0.5;
   let norm = 0;
@@ -53,16 +53,16 @@ function fbm(u: number, v: number, basePeriod: number, octaves: number, seed: nu
 
 // --------------------------------------------------------------- utilidades
 
-type RGB = [number, number, number];
+export type RGB = [number, number, number];
 
-const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+export const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+export const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+export const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
 /** Ponto da textura → (cor, altura). Altura em [0, 1]. */
-type Shader = (u: number, v: number) => { c: RGB; h: number; a?: number };
+export type Shader = (u: number, v: number) => { c: RGB; h: number; a?: number };
 
-function render(shader: Shader, normalStrength: number, N = 256): TexturePair {
+export function render(shader: Shader, normalStrength: number, N = 256): TexturePair {
   const color = document.createElement('canvas');
   color.width = color.height = N;
   const cctx = color.getContext('2d')!;
@@ -108,7 +108,7 @@ function heightToNormal(h: Float32Array, strength: number, N: number): HTMLCanva
 }
 
 /** Distância até a linha mais próxima de uma grade com `count` divisões. */
-const gridDist = (t: number, count: number) => {
+export const gridDist = (t: number, count: number) => {
   const f = (t * count) % 1;
   return Math.min(f, 1 - f) / count;
 };

@@ -13,7 +13,7 @@ FPS tático 3D original para navegador, com foco em celular (touch, horizontal) 
 | Defesa vence | elimina o ataque antes do plantio, tempo esgota ou desarma |
 | Morte | volta só na próxima rodada |
 
-Parâmetros de URL: `?mapa=teste` (campo de treino com alvos e respawn), `?bots=0` (sem bots, para testar regras).
+Parâmetros de URL: `?mapa=teste` (campo de treino com alvos e respawn), `?bots=0` (sem bots, para testar regras), `?graficos=leve` (força o modo leve).
 
 ## Stack
 
@@ -99,6 +99,7 @@ Regras que sustentam a evolução para multiplayer:
 6. HUD final, menu e opções; troca de lado (jogar na defesa)
 7. Arte (em andamento)
    - ✅ Mapa: texturas procedurais geradas no carregamento (concreto, chapa ondulada, madeira, contêiner em 3 cores, pilar com faixa de alerta, chapa xadrez, pintura do site) com normal map; UV em escala de mundo; sombras do sol estáticas (desenhadas uma vez); claraboias no galpão e no B; céu em degradê
-   - Arma em primeira pessoa
+   - ✅ Arma em primeira pessoa: fuzil original em partes (culatra, guarda-mão, trilho, mira de ponto vermelho, cano, quebra-chamas, carregador, coronha), mãos com luva e manga camuflada; câmera própria com FOV de 47° (proporção natural sem estreitar a visão); recarga em etapas (inclina, solta o pente, mão busca outro, encaixa); cápsulas ejetadas; clarão em estrela aditivo
+   - ✅ Opção Gráficos altos / Leve (sem sombras e relevo, resolução 1x); `?graficos=leve`
    - Personagens (a partir das folhas de conceito, via Meshy/Tripo + Mixamo)
    - Sons gravados

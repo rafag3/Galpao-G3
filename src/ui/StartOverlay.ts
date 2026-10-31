@@ -33,6 +33,10 @@ export class StartOverlay {
         <div class="difficulty" role="radiogroup" aria-label="Dificuldade">
           ${LEVELS.map(([id, label]) => `<button type="button" role="radio" data-d="${id}" aria-checked="${settings.difficulty === id}">${label}</button>`).join('')}
         </div>
+        <div class="difficulty graphics" role="radiogroup" aria-label="Gráficos">
+          <button type="button" role="radio" data-g="high" aria-checked="${settings.graphics === 'high'}">Gráficos altos</button>
+          <button type="button" role="radio" data-g="low" aria-checked="${settings.graphics === 'low'}">Leve</button>
+        </div>
         <div class="settings">
           <label>Sensibilidade ${opts.isTouch ? 'do toque' : 'do mouse'}
             <input type="range" name="sens" min="0.3" max="3" step="0.05" value="${settings[sensKey]}">
@@ -61,6 +65,17 @@ export class StartOverlay {
         saveSettings();
         diffButtons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
         opts.onDifficultyChange(settings.difficulty);
+      }),
+    );
+
+    // Gráficos: o cenário é montado na carga, então trocar exige recarregar
+    this.root.querySelectorAll<HTMLButtonElement>('.graphics button').forEach((b) =>
+      b.addEventListener('click', () => {
+        const g = b.dataset.g as 'high' | 'low';
+        if (g === settings.graphics) return;
+        settings.graphics = g;
+        saveSettings();
+        location.reload();
       }),
     );
 

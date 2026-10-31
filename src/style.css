@@ -380,3 +380,6 @@ body.can-plant .btn-use { display: block; }
 /* Menu aberto: esconde o HUD do jogo por trás dele */
 body.menu-open :is(.round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
 .overlay.start { background: rgba(10, 12, 15, 0.86); }
+
+.difficulty.graphics { margin-left: 8px; }
+.difficulty.graphics button { font-size: 12px; padding: 8px 12px; }

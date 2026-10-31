@@ -54,7 +54,9 @@ export class Game {
   async init(level: LevelData, simOptions: SimOptions = {}): Promise<void> {
     await initPhysics();
     this.sim = new GameSim(level, Date.now() % 100000, { difficulty: settings.difficulty, ...simOptions });
-    this.renderer = new GameRenderer(this.canvas, level, this.sim.targets.targets, isTouchDevice());
+    // ?graficos=leve força o modo leve (aparelhos fracos e testes automatizados)
+    const quality = new URLSearchParams(location.search).get('graficos') === 'leve' ? 'low' : settings.graphics;
+    this.renderer = new GameRenderer(this.canvas, level, this.sim.targets.targets, isTouchDevice(), quality);
     this.currEye = this.prevEye = this.sim.player.eyePosition();
     this.view = { yaw: level.spawnYaw, pitch: 0 };
 

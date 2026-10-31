@@ -23,10 +23,16 @@ import { CombatantViews } from './CombatantViews';
 import { ImpactDecals } from './ImpactDecals';
 import { buildSiteSigns } from './SiteSigns';
 import { TargetViews } from './TargetViews';
-import { ViewModel } from './ViewModel';
+import { VIEWMODEL_LAYER, ViewModel } from './ViewModel';
 
 /** Limite de resolução interna: telas de celular têm DPR 3, o que custa caro. */
 const MAX_PIXEL_RATIO = 1.5;
+
+/**
+ * alta: sombras, relevo e resolução até 1,5x.
+ * leve: sem sombras e sem relevo, resolução 1x (aparelhos fracos).
+ */
+export type GraphicsQuality = 'high' | 'low';
 
 export class GameRenderer {
   readonly engine: Engine;
@@ -37,12 +43,19 @@ export class GameRenderer {
   readonly impacts: ImpactDecals;
   readonly combatants: CombatantViews;
   readonly bomb: BombView;
-  private readonly shadows: ShadowGenerator;
+  private readonly shadows: ShadowGenerator | null;
 
   /**
    * @param lowEnd celular: sombra em resolução menor e filtro mais barato
+   * @param quality 'low' desliga sombras e relevo
    */
-  constructor(canvas: HTMLCanvasElement, level: LevelData, targets: readonly TargetState[], lowEnd = false) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    level: LevelData,
+    targets: readonly TargetState[],
+    lowEnd = false,
+    private readonly quality: GraphicsQuality = 'high',
+  ) {
     this.engine = new Engine(
       canvas,
       true,
@@ -65,6 +78,18 @@ export class GameRenderer {
     this.camera.maxZ = 200;
     this.camera.fov = 1.2; // ~69° vertical; amplo o bastante para tela larga
     this.camera.inputs.clear(); // a câmera é dirigida pela simulação
+    this.camera.layerMask = ~VIEWMODEL_LAYER & 0x0fffffff;
+
+    // Câmera da arma: segue a principal com campo de visão mais fechado, para
+    // a arma ter proporção natural sem estreitar a visão do jogo
+    const vmCam = new FreeCamera('viewmodel-cam', Vector3.Zero(), scene);
+    vmCam.parent = this.camera;
+    vmCam.fov = 0.82;
+    vmCam.minZ = 0.01;
+    vmCam.maxZ = 5;
+    vmCam.inputs.clear();
+    vmCam.layerMask = VIEWMODEL_LAYER;
+    scene.activeCameras = [this.camera, vmCam];
 
     // Luz de preenchimento (céu) fria e sol quente: o contraste dá volume
     const hemi = new HemisphericLight('hemi', new Vector3(0.2, 1, 0.1), scene);
@@ -79,19 +104,21 @@ export class GameRenderer {
 
     // Sombras do cenário: o mapa é estático, então o shadow map é desenhado
     // uma única vez (custo zero por frame depois disso).
-    const shadows = new ShadowGenerator(lowEnd ? 1024 : 2048, sun);
-    shadows.usePercentageCloserFiltering = true;
-    shadows.filteringQuality = lowEnd ? ShadowGenerator.QUALITY_LOW : ShadowGenerator.QUALITY_MEDIUM;
-    shadows.bias = 0.0015;
-    shadows.normalBias = 0.02;
+    const shadows = quality === 'high' ? new ShadowGenerator(lowEnd ? 1024 : 2048, sun) : null;
+    if (shadows) {
+      shadows.usePercentageCloserFiltering = true;
+      shadows.filteringQuality = lowEnd ? ShadowGenerator.QUALITY_LOW : ShadowGenerator.QUALITY_MEDIUM;
+      shadows.bias = 0.0015;
+      shadows.normalBias = 0.02;
+      // Só congela depois que shaders e malhas estão prontos: congelar no
+      // primeiro frame grava um shadow map vazio.
+      scene.executeWhenReady(() => {
+        const map = shadows.getShadowMap()!;
+        map.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
+        map.resetRefreshCounter();
+      });
+    }
     this.shadows = shadows;
-    // Só congela depois que shaders e malhas estão prontos: congelar no
-    // primeiro frame grava um shadow map vazio.
-    scene.executeWhenReady(() => {
-      const map = shadows.getShadowMap()!;
-      map.refreshRate = RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
-      map.resetRefreshCounter();
-    });
 
     buildSky(scene);
     this.buildLevel(level);
@@ -107,7 +134,7 @@ export class GameRenderer {
   private buildLevel(level: LevelData): void {
     // Agrupa blocos por material e funde em uma malha por material: ~12 draw
     // calls para o cenário inteiro, em vez de um por bloco.
-    const mats = new MapMaterials(this.scene);
+    const mats = new MapMaterials(this.scene, this.quality === 'high');
     const byKey = new Map<MaterialKey, Mesh[]>();
     for (const [i, b] of level.blocks.entries()) {
       const key = MapMaterials.keyFor(b);
@@ -127,8 +154,8 @@ export class GameRenderer {
       merged.name = `level-${key}`;
       merged.material = mats.get(key);
       merged.isPickable = false;
-      merged.receiveShadows = key !== 'siteMarking';
-      if (key !== 'floor' && key !== 'siteMarking') this.shadows.addShadowCaster(merged, false);
+      merged.receiveShadows = !!this.shadows && key !== 'siteMarking';
+      if (key !== 'floor' && key !== 'siteMarking') this.shadows?.addShadowCaster(merged, false);
       merged.freezeWorldMatrix();
       merged.doNotSyncBoundingInfo = true;
     }
@@ -148,7 +175,7 @@ export class GameRenderer {
   }
 
   applyPixelRatio(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.quality === 'high' ? MAX_PIXEL_RATIO : 1);
     this.engine.setHardwareScalingLevel(1 / dpr);
   }
 
