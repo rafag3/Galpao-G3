@@ -53,9 +53,15 @@ const pillar = (px: number, py: number, h: number) => box('pillar', px, py, 0.6,
 /** Mureta de 1,1 m: protege quem está agachado. */
 const lowWall = (px: number, py: number, w: number, d: number) => box('crate', px, py, w, d, 1.1);
 
-function roof(r: PlanRect, height: number): Block {
+/** Telhado em faixas com claraboias: o sol entra e desenha faixas de luz no chão. */
+function skylitRoof(r: PlanRect, height: number, strip: number, gap: number): Block[] {
   const [x0, y0, x1, y1] = r;
-  return box('roof', (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, 0.4, height);
+  const out: Block[] = [];
+  for (let x = x0; x < x1; x += strip + gap) {
+    const xe = Math.min(x + strip, x1);
+    out.push(box('roof', (x + xe) / 2, (y0 + y1) / 2, xe - x, y1 - y0, 0.4, height));
+  }
+  return out;
 }
 
 function marking(r: PlanRect): Block {
@@ -135,8 +141,8 @@ export const galpao: LevelData = {
   blocks: [
     { kind: 'floor', position: [0, -0.25, 0], size: [W, 0.5, D] },
     ...solidBlocks(Object.values(WALKABLE), { width: W, depth: D, offsetX: OX, offsetZ: OZ }, WALL_H),
-    roof(WALKABLE.galpao, WALL_H),
-    roof(WALKABLE.bombsiteB, 5),
+    ...skylitRoof(WALKABLE.galpao, WALL_H, 5, 2),
+    ...skylitRoof(WALKABLE.bombsiteB, 5, 4, 1.5),
     marking(SITE_A),
     marking(SITE_B),
     ...props,

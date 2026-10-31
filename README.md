@@ -62,7 +62,8 @@ src/
              desarmar, buscar bomba, proteger); BotBrain executa e combate
     nav/     NavGrid: grade de 0,5 m gerada do nível, A* + suavização
              ← sim/ inteiro: sem Babylon, sem DOM
-  render/    GameRenderer, ViewModel, TargetViews, ImpactDecals: só leem o estado
+  render/    GameRenderer, ViewModel, CombatantViews, BombView, ImpactDecals…
+    art/     ProceduralTextures, MapMaterials, Sky: arte gerada por código
   audio/     SoundFx: sons sintetizados provisórios (Web Audio)
   level/     Níveis como dados. galpao.ts descreve as áreas caminháveis e os
              objetos; walkableGrid gera as paredes do resto (greedy meshing)
@@ -96,4 +97,8 @@ Regras que sustentam a evolução para multiplayer:
 4. ✅ Bots: navegação A* em grade, visão por raycast (sem atravessar paredes), reação de 0,6 s, erro de mira que assenta, rajadas, audição de tiros, um bot de apoio por avistamento, anti-travamento
 5. ✅ Rodadas e bomba: plantar/desarmar/explodir, queda e coleta da bomba, aliados bots, desarme e retomada pela defesa, placar, fim de partida
 6. HUD final, menu e opções; troca de lado (jogar na defesa)
-7. Arte final (low-poly semi-realista, GLB + KTX2, lightmaps)
+7. Arte (em andamento)
+   - ✅ Mapa: texturas procedurais geradas no carregamento (concreto, chapa ondulada, madeira, contêiner em 3 cores, pilar com faixa de alerta, chapa xadrez, pintura do site) com normal map; UV em escala de mundo; sombras do sol estáticas (desenhadas uma vez); claraboias no galpão e no B; céu em degradê
+   - Arma em primeira pessoa
+   - Personagens (a partir das folhas de conceito, via Meshy/Tripo + Mixamo)
+   - Sons gravados
