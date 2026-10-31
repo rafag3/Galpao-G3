@@ -63,7 +63,7 @@ src/
     nav/     NavGrid: grade de 0,5 m gerada do nível, A* + suavização
              ← sim/ inteiro: sem Babylon, sem DOM
   render/    GameRenderer, ViewModel, CombatantViews, BombView, ImpactDecals…
-    art/     ProceduralTextures, MapMaterials, Sky: arte gerada por código
+    art/     ProceduralTextures, MapMaterials, Sky, WeaponTextures, SoldierAtlas: arte gerada por código
   audio/     SoundFx: sons sintetizados provisórios (Web Audio)
   level/     Níveis como dados. galpao.ts descreve as áreas caminháveis e os
              objetos; walkableGrid gera as paredes do resto (greedy meshing)
@@ -101,5 +101,6 @@ Regras que sustentam a evolução para multiplayer:
    - ✅ Mapa: texturas procedurais geradas no carregamento (concreto, chapa ondulada, madeira, contêiner em 3 cores, pilar com faixa de alerta, chapa xadrez, pintura do site) com normal map; UV em escala de mundo; sombras do sol estáticas (desenhadas uma vez); claraboias no galpão e no B; céu em degradê
    - ✅ Arma em primeira pessoa: fuzil original em partes (culatra, guarda-mão, trilho, mira de ponto vermelho, cano, quebra-chamas, carregador, coronha), mãos com luva e manga camuflada; câmera própria com FOV de 47° (proporção natural sem estreitar a visão); recarga em etapas (inclina, solta o pente, mão busca outro, encaixa); cápsulas ejetadas; clarão em estrela aditivo
    - ✅ Opção Gráficos altos / Leve (sem sombras e relevo, resolução 1x); `?graficos=leve`
-   - Personagens (a partir das folhas de conceito, via Meshy/Tripo + Mixamo)
+   - ✅ Soldados procedurais: modelados por código em peças low-poly com textura-atlas por equipe (defesa: azul-marinho, colete coiote, capacete e óculos âmbar; ataque: camuflado bege, colete oliva, capuz, boné e mochila); animados por articulações (passada que acompanha a velocidade, agachar dobrando joelhos, tronco e cabeça seguindo a mira, queda ao morrer); sombra de contato sob os pés. 8 draw calls por soldado
+   - Personagens finais em .glb (Meshy/Tripo + Mixamo), se vierem: entram no lugar de `CombatantViews` sem mudar a simulação
    - Sons gravados
