@@ -168,6 +168,25 @@ export class GameRenderer {
     this.scene.render();
   }
 
+  /**
+   * Ponto do mundo → posição na tela em px CSS, usando a câmera do último
+   * frame desenhado. null se estiver atrás da câmera ou fora da tela.
+   */
+  project(p: Vec3): { x: number; y: number } | null {
+    const cam = this.camera;
+    const to = this.tmpA.set(p.x - cam.position.x, p.y - cam.position.y, p.z - cam.position.z);
+    cam.getDirectionToRef(Vector3.Forward(), this.tmpB);
+    if (Vector3.Dot(to, this.tmpB) < 0.2) return null;
+    const ndc = Vector3.TransformCoordinatesFromFloatsToRef(p.x, p.y, p.z, this.scene.getTransformMatrix(), this.tmpA);
+    if (Math.abs(ndc.x) > 1.1 || Math.abs(ndc.y) > 1.1) return null;
+    const s = this.engine.getHardwareScalingLevel();
+    const w = this.engine.getRenderWidth(true) * s;
+    const h = this.engine.getRenderHeight(true) * s;
+    return { x: ((ndc.x + 1) / 2) * w, y: ((1 - ndc.y) / 2) * h };
+  }
+  private readonly tmpA = new Vector3();
+  private readonly tmpB = new Vector3();
+
   /** Pixels de tela por radiano no centro da tela (para a mira dinâmica). */
   pixelsPerRadian(): number {
     const h = this.engine.getRenderHeight(true) * this.engine.getHardwareScalingLevel();

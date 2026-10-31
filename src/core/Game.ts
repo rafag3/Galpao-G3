@@ -15,6 +15,9 @@ import { clamp, lerp, type Vec3 } from '../sim/math';
 import { initPhysics } from '../sim/PhysicsWorld';
 import { DebugHud } from '../ui/DebugHud';
 import { Minimap } from '../ui/Minimap';
+import { AllyTags } from '../ui/AllyTags';
+import { KillFeed } from '../ui/KillFeed';
+import { displayName } from '../ui/names';
 import { Hud } from '../ui/Hud';
 import { type BombAction, RoundHud } from '../ui/RoundHud';
 import { inSite } from '../sim/RoundSystem';
@@ -37,6 +40,8 @@ export class Game {
   private hud?: Hud;
   private roundHud?: RoundHud;
   private minimap?: Minimap;
+  private killFeed?: KillFeed;
+  private allyTags?: AllyTags;
   /** Inimigos avistados pelo time (radar); recalculado algumas vezes por segundo. */
   private spotted = new Set<EntityId>();
   private spotTimer = 0;
@@ -88,6 +93,8 @@ export class Game {
 
     this.hud = new Hud(this.uiRoot);
     this.minimap = new Minimap(this.uiRoot, level);
+    this.killFeed = new KillFeed(this.uiRoot);
+    this.allyTags = new AllyTags(this.uiRoot);
     if (this.sim.rounds) {
       this.roundHud = new RoundHud(this.uiRoot, () => {
         this.sim.restartMatch();
@@ -116,6 +123,18 @@ export class Game {
       this.running = false;
       overlay.show();
     };
+    // Engrenagem ao lado do radar: abre o menu (no celular é a única pausa)
+    const gear = document.createElement('button');
+    gear.type = 'button';
+    gear.className = 'hud-gear';
+    gear.setAttribute('aria-label', 'Menu');
+    gear.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.4-2.5 1a7.5 7.5 0 0 0-1.7-1L15 3.3h-4l-.4 2.7a7.5 7.5 0 0 0-1.7 1l-2.5-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-1a7.5 7.5 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.5 7.5 0 0 0 1.7-1l2.5 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
+    gear.addEventListener('click', () => {
+      if (!touch) document.exitPointerLock?.();
+      pause();
+    });
+    this.uiRoot.append(gear);
     // PC: soltar o mouse (Esc) pausa
     document.addEventListener('pointerlockchange', () => {
       if (!touch && document.pointerLockElement !== this.canvas) pause();
@@ -186,6 +205,7 @@ export class Game {
     this.hits = this.kills = 0;
     this.input.clearLatched();
     this.roundHud?.reset();
+    this.killFeed?.clear();
     this.resetView();
   }
 
@@ -195,6 +215,28 @@ export class Game {
     this.currEye = this.prevEye = this.sim.player.eyePosition();
     this.captureFeet();
     this.prevFeet = new Map(this.currFeet);
+  }
+
+  private reportKill(attacker: EntityId, victim: EntityId, head: boolean): void {
+    const k = this.sim.find(attacker);
+    const v = this.sim.find(victim);
+    if (!v) return;
+    const mine = attacker === 'player' || victim === 'player';
+    this.killFeed?.add(k ? { name: displayName(k.id), team: k.team } : null, { name: displayName(v.id), team: v.team }, head, mine);
+  }
+
+  /** Nome e vida sobre os aliados vivos (projetados da posição 3D da cabeça). */
+  private updateAllyTags(feetOf: (id: EntityId) => Vec3): void {
+    if (!this.allyTags) return;
+    const human = this.sim.human;
+    const allies = this.sim.bots.map((b) => b.combatant).filter((c) => c.alive && c.team === human.team);
+    this.allyTags.update(
+      allies.map((c) => {
+        const f = feetOf(c.id);
+        const head = { x: f.x, y: f.y + (c.controller.state.crouching ? 1.45 : 2.05), z: f.z };
+        return { id: c.id, name: displayName(c.id), health: c.health, screen: this.renderer.project(head) };
+      }),
+    );
   }
 
   private updateMinimap(dt: number, feetOf: (id: EntityId) => Vec3): void {
@@ -249,6 +291,7 @@ export class Game {
         if (!e.onEntity) this.renderer.impacts.add(e.point, e.normal);
         break;
       case 'hit':
+        if (e.killed && !e.victim.startsWith('target:')) this.reportKill(e.attacker, e.victim, e.part === 'head');
         if (mine(e.attacker)) {
           this.hits++;
           if (e.killed) this.kills++;
@@ -379,6 +422,8 @@ export class Game {
       if (this.renderer.bomb.update(dt, bomb)) this.sound.beep();
     }
     this.updateMinimap(dt, lerpFeet);
+    this.killFeed?.update(dt);
+    this.updateAllyTags(lerpFeet);
     this.debug?.update(dt, this.renderer.engine, p, this.instrumentation?.drawCallsCounter.current ?? 0);
   }
 }

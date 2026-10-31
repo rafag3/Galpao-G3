@@ -1,4 +1,4 @@
-// Radar no canto superior esquerdo. Gira com o jogador (frente sempre para
+// Radar redondo no canto superior esquerdo. Gira com o jogador (frente sempre para
 // cima), centrado nele. Mostra o mapa em planta, os sites, os aliados, a
 // bomba quando o time sabe onde ela está e só os inimigos que alguém do time
 // está vendo agora (como no CS: o radar não revela quem está escondido).
@@ -125,8 +125,9 @@ export class Minimap {
       let rx = (dx * cos - dy * sin) * zoom;
       let ry = (dx * sin + dy * cos) * zoom;
       if (clampEdge) {
-        const lim = half - 6 * dot;
-        const m = Math.max(Math.abs(rx), Math.abs(ry));
+        // Radar redondo: quem está longe fica preso na borda do círculo
+        const lim = half - 7 * dot;
+        const m = Math.hypot(rx, ry);
         if (m > lim) {
           rx *= lim / m;
           ry *= lim / m;

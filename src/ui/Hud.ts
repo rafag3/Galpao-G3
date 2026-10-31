@@ -34,7 +34,18 @@ export class Hud {
     this.reserve = document.createElement('span');
     this.reserve.className = 'ammo-reserve';
     this.reloadBar = div('reload-bar');
-    this.ammo.append(this.mag, this.reserve, this.reloadBar);
+    // Cartão da arma: silhueta, munição e nome (por enquanto só o fuzil)
+    const icon = document.createElement('div');
+    icon.className = 'weapon-icon';
+    icon.innerHTML =
+      '<svg viewBox="0 0 64 20" aria-hidden="true"><path d="M2 8h6l2-3h22V3h5v2h13v2h9v3h-9l-2 2h-9l-3 7h-5l2-7h-9l-3 5h-6l2-5H9L8 11H2z"/></svg>';
+    const nums = document.createElement('div');
+    nums.className = 'ammo-nums';
+    nums.append(this.mag, this.reserve);
+    const name = document.createElement('div');
+    name.className = 'weapon-name';
+    name.textContent = 'Fuzil';
+    this.ammo.append(icon, nums, name, this.reloadBar);
 
     this.health = div('hud-health');
     this.healthValue = document.createElement('span');

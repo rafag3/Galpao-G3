@@ -3,6 +3,7 @@
 
 import type { Combatant, Team } from '../sim/Combatant';
 import { ROUND } from '../sim/config';
+import { displayName } from './names';
 import type { RoundEndReason } from '../sim/events';
 import type { BombState, RoundState } from '../sim/RoundSystem';
 
@@ -33,13 +34,14 @@ function div(className: string, parent?: HTMLElement): HTMLDivElement {
 
 export class RoundHud {
   private readonly board: HTMLDivElement;
-  private readonly atk: HTMLDivElement;
-  private readonly def: HTMLDivElement;
-  private readonly atkScore: HTMLSpanElement;
-  private readonly defScore: HTMLSpanElement;
+  /** Seu time sempre à esquerda; o adversário à direita. */
+  private readonly mySquad: HTMLDivElement;
+  private readonly enemySquad: HTMLDivElement;
+  private readonly myScore: HTMLDivElement;
+  private readonly enemyScore: HTMLDivElement;
   private readonly clock: HTMLDivElement;
-  private readonly atkAlive: HTMLDivElement;
-  private readonly defAlive: HTMLDivElement;
+  private readonly roundLabel: HTMLSpanElement;
+  private readonly clockTime: HTMLSpanElement;
   private readonly carrier: HTMLDivElement;
   private readonly progress: HTMLDivElement;
   private readonly progressFill: HTMLDivElement;
@@ -53,29 +55,18 @@ export class RoundHud {
   private lastKey = '';
 
   constructor(parent: HTMLElement, onRestart: () => void) {
+    // Placar: [seu time: um ícone por jogador] [placar] [rodada e relógio] [placar] [adversários]
     this.board = div('round-board', parent);
-    // Cada lado: placar + sigla (com "você" no time do jogador) + vivos
-    const team = (cls: string, name: string) => {
-      const el = div(`team ${cls}`, this.board);
-      const score = document.createElement('span');
-      score.className = 'score';
-      const meta = div('meta', el);
-      div('side-name', meta).textContent = name;
-      const alive = div('alive', meta);
-      if (cls === 'atk') el.prepend(score);
-      else el.append(score);
-      return { el, score, alive };
-    };
-    const atk = team('atk', 'TR');
-    this.atk = atk.el;
-    this.atkScore = atk.score;
-    this.atkAlive = atk.alive;
+    this.mySquad = div('squad mine', this.board);
+    this.myScore = div('side-score', this.board);
     this.clock = div('clock', this.board);
-    this.board.append(this.clock);
-    const def = team('def', 'CT');
-    this.def = def.el;
-    this.defScore = def.score;
-    this.defAlive = def.alive;
+    this.roundLabel = document.createElement('span');
+    this.roundLabel.className = 'round-no';
+    this.clockTime = document.createElement('span');
+    this.clockTime.className = 'time';
+    this.clock.append(this.roundLabel, this.clockTime);
+    this.enemyScore = div('side-score', this.board);
+    this.enemySquad = div('squad enemy', this.board);
 
     this.carrier = div('bomb-chip', parent);
     this.carrier.textContent = 'Você está com a bomba';
@@ -118,6 +109,25 @@ export class RoundHud {
     this.matchScreen.classList.remove('hidden');
   }
 
+  /** Um ícone por jogador: vivo na cor do lado, morto com X; o seu com contorno. */
+  private renderSquad(el: HTMLDivElement, list: readonly Combatant[], human: Combatant): void {
+    el.replaceChildren(
+      ...list.map((c) => {
+        const chip = div(`chip ${c.team === 'attack' ? 'atk' : 'def'}${c.alive ? '' : ' dead'}${c === human ? ' me' : ''}`);
+        chip.textContent = c.alive ? displayName(c.id).charAt(0) : '✕';
+        chip.title = displayName(c.id);
+        return chip;
+      }),
+    );
+    const n = list.filter((c) => c.alive).length;
+    el.setAttribute('aria-label', `${n} ${n === 1 ? 'vivo' : 'vivos'}`);
+  }
+
+  private renderScore(el: HTMLDivElement, side: Team, score: number): void {
+    el.className = `side-score ${side === 'attack' ? 'atk' : 'def'}`;
+    el.innerHTML = `<b>${score}</b><small>${SIDE[side]}</small>`;
+  }
+
   /** Partida recomeçada pelo menu: some com o fim de partida e o banner. */
   reset(): void {
     this.matchScreen.classList.add('hidden');
@@ -132,29 +142,30 @@ export class RoundHud {
   update(dt: number, state: RoundState, bomb: BombState, all: readonly Combatant[], human: Combatant, action: BombAction): void {
     const mine = human.team;
     const canPlant = action === 'plant';
-    // Placar e vivos: só reescreve o DOM quando algo muda
-    const alive = (t: 'attack' | 'defense') => {
-      const n = all.filter((c) => c.team === t && c.alive).length;
-      return n === 0 ? 'nenhum vivo' : n === 1 ? '1 vivo' : `${n} vivos`;
+    // Placar e ícones: só reescreve o DOM quando algo muda
+    const enemy: Team = mine === 'attack' ? 'defense' : 'attack';
+    const squad = (t: Team) => {
+      const list = all.filter((c) => c.team === t);
+      // O jogador primeiro no próprio time
+      return list.sort((a, b) => (a === human ? -1 : b === human ? 1 : 0));
     };
-    const key = `${state.score.attack}|${state.score.defense}|${alive('attack')}|${alive('defense')}|${mine}`;
+    const key = `${state.score.attack}|${state.score.defense}|${mine}|${state.round}|${all.map((c) => `${c.id}${c.team[0]}${c.alive ? 1 : 0}`).join()}`;
     if (key !== this.lastKey) {
-      this.atk.classList.toggle('mine', mine === 'attack');
-      this.def.classList.toggle('mine', mine === 'defense');
-      this.atkScore.textContent = String(state.score.attack);
-      this.defScore.textContent = String(state.score.defense);
-      this.atkAlive.textContent = alive('attack');
-      this.defAlive.textContent = alive('defense');
+      this.renderSquad(this.mySquad, squad(mine), human);
+      this.renderSquad(this.enemySquad, squad(enemy), human);
+      this.renderScore(this.myScore, mine, state.score[mine]);
+      this.renderScore(this.enemyScore, enemy, state.score[enemy]);
+      this.roundLabel.textContent = `Rodada ${state.round}`;
       this.lastKey = key;
     }
 
     // Rodada encerrada (por eliminação, por exemplo): a bomba que sobrou não conta mais
     const planted = bomb.status === 'planted' && state.phase === 'live';
     this.clock.classList.toggle('bomb', planted);
-    if (state.phase === 'freeze') this.clock.textContent = `Preparação ${Math.ceil(state.timeLeft)}`;
-    else if (planted) this.clock.textContent = `Bomba ${mmss(bomb.timeLeft)}`;
-    else if (state.phase === 'live') this.clock.textContent = mmss(state.timeLeft);
-    else this.clock.textContent = 'Fim da rodada';
+    if (state.phase === 'freeze') this.clockTime.textContent = `Preparação ${Math.ceil(state.timeLeft)}`;
+    else if (planted) this.clockTime.textContent = `Bomba ${mmss(bomb.timeLeft)}`;
+    else if (state.phase === 'live') this.clockTime.textContent = mmss(state.timeLeft);
+    else this.clockTime.textContent = 'Fim da rodada';
 
     const carrying = bomb.status === 'carried' && bomb.carrier === human.id && human.alive;
     const live = state.phase === 'live' || state.phase === 'freeze';

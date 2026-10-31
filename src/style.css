@@ -266,17 +266,6 @@ body.can-use .btn-use { display: block; }
 }
 
 /* Vida e placar pessoal */
-.hud-health {
-  position: absolute;
-  left: calc(12px + var(--safe-l));
-  top: calc(144px + var(--safe-t));
-  width: 128px;
-  padding: 6px 12px 8px;
-  border-radius: 8px;
-  background: var(--panel);
-  pointer-events: none !important;
-  z-index: 5;
-}
 .health-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .health-value::before { content: '+ '; color: var(--muted); font-weight: 600; }
 .health-track { height: 5px; margin-top: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
@@ -322,18 +311,6 @@ body.is-touch .death-screen { font-size: 16px; }
   pointer-events: none !important;
   z-index: 5;
 }
-.round-board .team, .round-board .clock {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  background: var(--panel);
-}
-.round-board .team.atk { border-radius: 8px 0 0 8px; border-bottom: 3px solid var(--orange); }
-.round-board .team.def { border-radius: 0 8px 8px 0; border-bottom: 3px solid var(--blue); }
-.round-board .score { font-size: 22px; font-weight: 800; }
-.round-board .clock { min-width: 92px; justify-content: center; font-size: 16px; font-weight: 700; }
-.round-board .clock.bomb { color: #ff4d4d; }
 
 .bomb-chip, .round-alert, .use-progress, .round-banner {
   position: absolute;
@@ -373,32 +350,12 @@ body.is-touch .death-screen { font-size: 16px; }
 .overlay.match-over h1 { font-size: 44px; }
 
 /* Menu aberto: esconde o HUD do jogo por trás dele */
-body.menu-open :is(.minimap, .round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
+body.menu-open :is(.minimap, .hud-gear, .kill-feed, .ally-tags, .round-board, .bomb-chip, .round-alert, .round-banner, .use-progress, .hud-health, .hud-ammo, .touch-root, .crosshair, .hitmarker, .debug-hud, .death-screen) { visibility: hidden; }
 .crosshair.dead { visibility: hidden; }
 
 /* Placar: o time do jogador ganha destaque */
-.round-board .team.mine { background: rgba(255, 255, 255, 0.14); }
-.round-board .meta { display: grid; line-height: 1.1; }
-.round-board .def .meta { text-align: right; }
-.round-board .side-name { font-size: 13px; font-weight: 800; }
-.round-board .atk .side-name { color: var(--orange); }
-.round-board .def .side-name { color: var(--blue); }
-.round-board .mine .side-name::after { content: ' (você)'; font-weight: 600; color: var(--muted); }
-.round-board .alive { font-size: 12px; color: var(--text); white-space: nowrap; }
 
-/* Radar: canto superior esquerdo; vida logo abaixo */
-.minimap {
-  position: absolute;
-  left: calc(12px + var(--safe-l));
-  top: calc(8px + var(--safe-t));
-  width: 128px;
-  height: 128px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  pointer-events: none !important;
-  z-index: 5;
-}
-@media (max-height: 360px) { .minimap { width: 112px; height: 112px; } .hud-health { top: calc(126px + var(--safe-t)); width: 112px; } }
+
 
 /* ------------------------------------------------------------------ menu
    Painel à esquerda com faixa de alerta (a mesma dos pilares do mapa);
@@ -536,4 +493,151 @@ body.menu-open :is(.minimap, .round-board, .bomb-chip, .round-alert, .round-bann
 @media (max-width: 560px) {
   .menu-panel { width: 100%; }
   .howto-sides { grid-template-columns: 1fr; }
+}
+
+/* ------------------------------------------------------------- HUD (layout)
+   Radar redondo e engrenagem no canto superior esquerdo, abates logo abaixo;
+   placar com um ícone por jogador no centro; arma no canto superior direito
+   (touch); vida embaixo, no centro. */
+.minimap {
+  position: absolute;
+  left: calc(12px + var(--safe-l));
+  top: calc(8px + var(--safe-t));
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none !important;
+  z-index: 5;
+}
+.hud-gear {
+  position: absolute;
+  left: calc(150px + var(--safe-l));
+  top: calc(8px + var(--safe-t));
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  z-index: 6;
+}
+.hud-gear svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.hud-gear:focus-visible { outline: 3px solid var(--hazard); outline-offset: 2px; }
+
+.kill-feed {
+  position: absolute;
+  left: calc(12px + var(--safe-l));
+  top: calc(148px + var(--safe-t));
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  pointer-events: none !important;
+  z-index: 5;
+}
+.kf-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(16, 19, 23, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.kf-line.mine { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); }
+.kf-name.atk { color: var(--orange); }
+.kf-name.def { color: #6ea8ff; }
+.kf-gun { width: 30px; height: 9px; fill: var(--text); }
+.kf-head { width: 11px; height: 11px; color: #ff4d4d; fill: #ff4d4d; }
+
+/* Placar: [seu time] [placar] [rodada · relógio] [placar] [adversários] */
+.round-board { align-items: center; gap: 4px; }
+.squad { display: flex; gap: 3px; }
+.squad.enemy { flex-direction: row-reverse; }
+.chip {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+}
+.chip.atk { background: #b8561f; }
+.chip.def { background: #2c62b8; }
+.chip.dead { background: rgba(16, 19, 23, 0.75); color: #ff4d4d; }
+.chip.me { box-shadow: 0 0 0 2px #fff; }
+.side-score { display: grid; place-items: center; min-width: 40px; height: 40px; border-radius: 6px; line-height: 1; }
+.side-score b { font-size: 21px; font-weight: 800; }
+.side-score small { font-size: 9px; font-weight: 700; opacity: 0.9; }
+.side-score.atk { background: var(--orange); color: #1b1006; }
+.side-score.def { background: var(--blue); color: #fff; }
+.round-board .clock {
+  display: grid;
+  place-items: center;
+  min-width: 86px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  line-height: 1.05;
+}
+.round-board .clock .round-no { font-size: 10px; font-weight: 600; color: var(--muted); }
+.round-board .clock .time { font-size: 15px; font-weight: 800; }
+.round-board .clock.bomb .time { color: #ff4d4d; }
+
+/* Arma: silhueta, munição e nome */
+.hud-ammo { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: 10px; padding: 6px 12px 7px; }
+.weapon-icon svg { display: block; width: 64px; height: 20px; fill: var(--text); }
+.ammo-nums { white-space: nowrap; }
+.weapon-name { grid-column: 1 / -1; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* Vida: embaixo, no centro */
+.hud-health {
+  position: absolute;
+  left: 50%;
+  bottom: calc(22px + var(--safe-b));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+  width: 200px;
+  padding: 5px 12px 6px;
+  border-radius: 8px;
+  background: var(--panel);
+  pointer-events: none !important;
+  z-index: 5;
+}
+.hud-health .health-track { margin: 0; }
+.hud-health .hud-score { grid-column: 1 / -1; margin: 0; }
+.debug-hud { bottom: calc(2px + var(--safe-b)); padding: 1px 6px; font-size: 10px; opacity: 0.6; }
+
+/* Nomes sobre os aliados */
+.ally-tags { position: absolute; inset: 0; pointer-events: none !important; z-index: 3; overflow: hidden; }
+.ally-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
+  white-space: nowrap;
+}
+.ally-tag[hidden] { display: none; }
+.ally-tag .at-hp { color: #9be37a; font-size: 10px; }
+
+@media (max-height: 360px) {
+  .minimap { width: 112px; height: 112px; }
+  .hud-gear { left: calc(130px + var(--safe-l)); }
+  .kill-feed { top: calc(126px + var(--safe-t)); }
 }

@@ -14,10 +14,17 @@ export class DebugHud {
     parent.append(this.el);
   }
 
+  /** Detalhes de posição só com ?debug=1; no jogo normal, só FPS e draw calls. */
+  private readonly verbose = new URLSearchParams(location.search).has('debug');
+
   update(dt: number, engine: Engine, p: PlayerState, drawCalls: number): void {
     this.acc += dt;
     if (this.acc < 0.25) return;
     this.acc = 0;
+    if (!this.verbose) {
+      this.el.textContent = `${engine.getFps().toFixed(0)} fps · ${drawCalls} draws`;
+      return;
+    }
     const speed = Math.hypot(p.velocity.x, p.velocity.z);
     const state = p.crouching ? 'agachado' : p.grounded ? 'no chão' : 'no ar';
     this.el.textContent =
