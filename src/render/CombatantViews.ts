@@ -1,5 +1,6 @@
-// Soldados procedurais: modelados por código em peças low-poly com uma
-// textura-atlas por equipe e animados por articulações (quadril, joelhos,
+// Soldados procedurais: modelados por código em peças arredondadas (caixas de
+// quinas suaves, cápsulas, capacete em cúpula) com uma textura-atlas por
+// equipe (cor + relevo) e animados por articulações (quadril, joelhos,
 // tronco, cabeça, braços+arma). Substituíveis por modelos .glb no futuro sem
 // mudar a API usada pelo Game.
 //
@@ -12,8 +13,10 @@
 // próprio; atlas e sombra compartilhados.
 
 import { Color3 } from '@babylonjs/core/Maths/math.color';
-import { Vector3, type Vector4 } from '@babylonjs/core/Maths/math.vector';
+import { Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
+import { CreateCapsule } from '@babylonjs/core/Meshes/Builders/capsuleBuilder';
+import { CreateSphere } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
 import { CreateGround } from '@babylonjs/core/Meshes/Builders/groundBuilder';
 import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
@@ -23,6 +26,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import type { CombatantView, Team } from '../sim/Combatant';
 import type { EntityId } from '../sim/events';
 import { approach, type Vec3 } from '../sim/math';
+import { remapUV, roundedBox } from './art/Shapes';
 import { buildAtlas, cellUV, type AtlasCell } from './art/SoldierAtlas';
 
 /** Medidas do corpo (m). Somadas batem com a cápsula da simulação (1,8 m). */
@@ -72,23 +76,36 @@ class PartBuilder {
   private readonly parts: Mesh[] = [];
   constructor(private readonly scene: Scene) {}
 
-  box(size: V3, pos: V3, cell: AtlasCell, rot: V3 = [0, 0, 0]): this {
-    const uv = cellUV(cell);
-    const faceUV: Vector4[] = [uv, uv, uv, uv, uv, uv];
-    const m = CreateBox('sp', { width: size[0], height: size[1], depth: size[2], faceUV }, this.scene);
+  /** Caixa de quinas arredondadas (raio padrão: 30% da menor medida). */
+  box(size: V3, pos: V3, cell: AtlasCell, rot: V3 = [0, 0, 0], radius = Math.min(...size) * 0.3): this {
+    const m = roundedBox('sp', { width: size[0], height: size[1], depth: size[2], radius, atlas: cellUV(cell) }, this.scene);
     m.position.set(...pos);
     m.rotation.set(...rot);
     this.parts.push(m);
     return this;
   }
 
-  /** Caixa alongada ligando dois pontos (braços). */
-  limb(a: V3, b: V3, thick: number, cell: AtlasCell): this {
-    const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const len = Math.hypot(d[0], d[1], d[2]);
-    const mid: V3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-    // Caixa ao longo de +Z: pitch positivo aponta para baixo (mão esquerda do Babylon)
-    return this.box([thick, thick, len], mid, cell, [Math.asin(-d[1] / len), Math.atan2(d[0], d[2]), 0]);
+  /** Membro arredondado (cápsula, pode afunilar) ligando dois pontos. */
+  limb(a: V3, b: V3, thickA: number, cell: AtlasCell, thickB = thickA): this {
+    const d = new Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const len = d.length();
+    const m = remapUV(
+      CreateCapsule('cp', { height: len + (thickA + thickB) / 2, radiusTop: thickB / 2, radiusBottom: thickA / 2, tessellation: 10, subdivisions: 1, capSubdivisions: 3 }, this.scene),
+      cellUV(cell),
+    );
+    m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+    m.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), d.normalize(), new Quaternion());
+    this.parts.push(m);
+    return this;
+  }
+
+  /** Meia esfera achatada (capacete). */
+  dome(size: V3, pos: V3, cell: AtlasCell): this {
+    const m = remapUV(CreateSphere('dm', { segments: 10, diameter: 1, slice: 0.5 }, this.scene), cellUV(cell));
+    m.scaling.set(...size);
+    m.position.set(...pos);
+    this.parts.push(m);
+    return this;
   }
 
   build(name: string, parent: TransformNode, material: StandardMaterial): Mesh {
@@ -97,21 +114,23 @@ class PartBuilder {
     mesh.parent = parent;
     mesh.material = material;
     mesh.isPickable = false;
-    // O corpo não usa normal map nem sombras dinâmicas: barato no celular
-    mesh.freezeNormals();
     return mesh;
   }
 }
 
 export class CombatantViews {
   private readonly views = new Map<EntityId, View>();
-  private readonly atlas = new Map<Team, DynamicTexture>();
+  private readonly atlas = new Map<Team, { color: DynamicTexture; normal: DynamicTexture }>();
   private flashMat: StandardMaterial | null = null;
   private blobMat: StandardMaterial | null = null;
 
-  constructor(private readonly scene: Scene) {}
+  /** @param relief normal map no uniforme (desligado no modo Leve) */
+  constructor(
+    private readonly scene: Scene,
+    private readonly relief = true,
+  ) {}
 
-  private atlasFor(team: Team): DynamicTexture {
+  private atlasFor(team: Team): { color: DynamicTexture; normal: DynamicTexture } {
     let t = this.atlas.get(team);
     if (!t) {
       t = buildAtlas(this.scene, team);
@@ -134,7 +153,9 @@ export class CombatantViews {
     // Material próprio por soldado (o clarão de dano é por soldado); a
     // textura é compartilhada pela equipe.
     const material = new StandardMaterial(`sold-mat-${c.id}`, scene);
-    material.diffuseTexture = this.atlasFor(c.team);
+    const atlas = this.atlasFor(c.team);
+    material.diffuseTexture = atlas.color;
+    if (this.relief) material.bumpTexture = atlas.normal;
     material.specularColor = new Color3(0.06, 0.06, 0.06);
     material.emissiveColor = new Color3(0, 0, 0);
 
@@ -145,31 +166,40 @@ export class CombatantViews {
 
     // Tronco: quadril, peito, colete com bolsos, mochila (ataque) ou rádio (defesa)
     const t = P()
-      .box([0.36, 0.22, 0.22], [0, 0.02, 0], 'uniform')
-      .box([0.4, 0.42, 0.24], [0, 0.32, 0], 'uniform')
-      .box([0.44, 0.36, 0.3], [0, 0.32, 0.01], 'vest')
-      .box([0.1, 0.12, 0.06], [-0.12, 0.2, 0.18], 'vest')
-      .box([0.1, 0.12, 0.06], [0, 0.2, 0.18], 'vest')
-      .box([0.1, 0.12, 0.06], [0.12, 0.2, 0.18], 'vest')
-      .box([0.12, 0.14, 0.22], [0, 0.56, 0], 'uniform') // pescoço/gola
-      .box([0.4, 0.05, 0.25], [0, -0.05, 0], 'gear'); // cinto
-    if (attack) t.box([0.34, 0.42, 0.18], [0, 0.34, -0.23], 'pack').box([0.3, 0.1, 0.16], [0, 0.58, -0.22], 'pack');
-    else t.box([0.1, 0.2, 0.08], [-0.12, 0.38, -0.19], 'gear').box([0.015, 0.25, 0.015], [-0.14, 0.6, -0.19], 'gear');
+      .box([0.34, 0.22, 0.22], [0, 0.02, 0], 'uniform')
+      .box([0.38, 0.44, 0.24], [0, 0.32, 0], 'uniform', [0, 0, 0], 0.08)
+      .box([0.42, 0.34, 0.29], [0, 0.31, 0.01], 'vest', [0, 0, 0], 0.05)
+      .box([0.09, 0.12, 0.06], [-0.12, 0.2, 0.17], 'vest')
+      .box([0.09, 0.12, 0.06], [0, 0.2, 0.17], 'vest')
+      .box([0.09, 0.12, 0.06], [0.12, 0.2, 0.17], 'vest')
+      .box([0.08, 0.1, 0.05], [-0.15, 0.4, 0.16], 'vest') // bolso do rádio no peito
+      .box([0.14, 0.12, 0.2], [0, 0.55, 0], 'uniform', [0, 0, 0], 0.05) // gola
+      .box([0.37, 0.05, 0.24], [0, -0.06, 0], 'gear', [0, 0, 0], 0.02) // cinto
+      .box([0.1, 0.09, 0.05], [0.14, -0.04, 0.12], 'vest'); // bolso do cinto
+    if (attack) {
+      t.box([0.32, 0.4, 0.17], [0, 0.33, -0.22], 'pack', [0, 0, 0], 0.06) // mochila
+        .box([0.26, 0.1, 0.15], [0, 0.57, -0.21], 'pack', [0, 0, 0], 0.05) // saco de dormir
+        .box([0.04, 0.4, 0.03], [-0.12, 0.33, -0.12], 'gear') // alças
+        .box([0.04, 0.4, 0.03], [0.12, 0.33, -0.12], 'gear');
+    } else {
+      t.box([0.1, 0.2, 0.08], [-0.12, 0.38, -0.18], 'gear').box([0.012, 0.25, 0.012], [-0.14, 0.6, -0.18], 'gear', [0, 0, 0], 0.005);
+    }
     t.build(`sold-torso-${c.id}`, torso, material);
 
     // Cabeça: balaclava; defesa com capacete e óculos âmbar, ataque com capuz e boné
     const head = node('sold-head', torso, [0, NECK, 0]);
-    const h = P().box([0.21, 0.25, 0.23], [0, 0.13, 0.01], 'mask');
+    const h = P().box([0.2, 0.25, 0.22], [0, 0.13, 0.01], 'mask', [0, 0, 0], 0.08);
     if (attack) {
-      h.box([0.27, 0.26, 0.24], [0, 0.15, -0.04], 'pack') // capuz
-        .box([0.23, 0.07, 0.25], [0, 0.27, 0.01], 'vest') // boné
-        .box([0.21, 0.025, 0.12], [0, 0.245, 0.16], 'vest') // aba
-        .box([0.19, 0.05, 0.03], [0, 0.17, 0.125], 'lens');
+      h.box([0.26, 0.27, 0.24], [0, 0.15, -0.035], 'pack', [0, 0, 0], 0.1) // capuz
+        .dome([0.235, 0.12, 0.25], [0, 0.245, 0.01], 'vest') // boné
+        .box([0.19, 0.018, 0.11], [0, 0.25, 0.15], 'vest', [-0.12, 0, 0], 0.008) // aba
+        .box([0.18, 0.05, 0.03], [0, 0.17, 0.115], 'lens', [0, 0, 0], 0.012);
     } else {
-      h.box([0.27, 0.13, 0.29], [0, 0.26, 0], 'gear') // capacete
-        .box([0.29, 0.04, 0.31], [0, 0.2, 0], 'gear') // aba do capacete
-        .box([0.2, 0.06, 0.04], [0, 0.17, 0.13], 'lens')
-        .box([0.04, 0.05, 0.06], [0, 0.32, 0.12], 'gear'); // suporte de visão noturna
+      h.dome([0.27, 0.27, 0.29], [0, 0.18, -0.005], 'gear') // capacete (cúpula)
+        .box([0.26, 0.08, 0.27], [0, 0.17, -0.01], 'gear', [0, 0, 0], 0.035) // laterais do capacete
+        .box([0.19, 0.055, 0.035], [0, 0.17, 0.12], 'lens', [0, 0, 0], 0.015)
+        .box([0.04, 0.05, 0.05], [0, 0.3, 0.13], 'gear') // suporte de visão noturna
+        .box([0.025, 0.05, 0.15], [-0.15, 0.2, 0], 'gear'); // trilho lateral
     }
     h.build(`sold-head-${c.id}`, head, material);
 
@@ -182,37 +212,39 @@ export class CombatantViews {
     const L_EL: V3 = [-0.15, -0.2, 0.24];
     const L_HD: V3 = [0.08, -0.07, 0.52];
     P()
-      .box([0.13, 0.12, 0.13], [0.21, -0.02, 0], 'uniform') // ombros
-      .box([0.13, 0.12, 0.13], [-0.21, -0.02, 0], 'uniform')
-      .limb(R_SH, R_EL, 0.1, 'uniform')
-      .limb(R_EL, R_HD, 0.09, 'uniform')
-      .limb(L_SH, L_EL, 0.1, 'uniform')
-      .limb(L_EL, L_HD, 0.09, 'uniform')
-      .box([0.08, 0.09, 0.09], R_HD, 'gear') // luvas
-      .box([0.08, 0.09, 0.09], L_HD, 'gear')
+      .box([0.14, 0.13, 0.14], [0.2, -0.02, 0], 'uniform', [0, 0, 0], 0.06) // ombros
+      .box([0.14, 0.13, 0.14], [-0.2, -0.02, 0], 'uniform', [0, 0, 0], 0.06)
+      .limb(R_SH, R_EL, 0.105, 'uniform', 0.09)
+      .limb(R_EL, R_HD, 0.09, 'uniform', 0.075)
+      .limb(L_SH, L_EL, 0.105, 'uniform', 0.09)
+      .limb(L_EL, L_HD, 0.09, 'uniform', 0.075)
+      .box([0.075, 0.08, 0.1], R_HD, 'gear') // luvas
+      .box([0.075, 0.08, 0.1], L_HD, 'gear')
       // Fuzil
-      .box([0.055, 0.1, 0.42], [0.1, -0.06, 0.4], 'gun') // corpo
-      .box([0.03, 0.03, 0.26], [0.1, -0.04, 0.73], 'gun') // cano
-      .box([0.05, 0.08, 0.26], [0.13, -0.07, 0.07], 'gun') // coronha
-      .box([0.045, 0.16, 0.07], [0.1, -0.18, 0.42], 'gun', [0.25, 0, 0]) // carregador
-      .box([0.04, 0.05, 0.1], [0.1, 0.02, 0.36], 'gun') // mira
+      .box([0.05, 0.085, 0.36], [0.1, -0.055, 0.42], 'gun') // corpo e guarda-mão
+      .box([0.03, 0.015, 0.4], [0.1, -0.005, 0.42], 'gun', [0, 0, 0], 0.004) // trilho
+      .limb([0.1, -0.04, 0.6], [0.1, -0.04, 0.86], 0.024, 'gun') // cano
+      .box([0.042, 0.075, 0.24], [0.13, -0.07, 0.07], 'gun') // coronha
+      .box([0.035, 0.09, 0.04], [0.1, -0.12, 0.28], 'gun', [-0.35, 0, 0]) // empunhadura
+      .box([0.035, 0.15, 0.06], [0.1, -0.17, 0.43], 'gun', [0.25, 0, 0]) // carregador
+      .box([0.035, 0.045, 0.07], [0.1, 0.025, 0.36], 'gun', [0, 0, 0], 0.012) // mira
       .build(`sold-aim-${c.id}`, aim, material);
 
-    // Pernas: coxa pendurada no quadril, canela no joelho
+    // Pernas: coxa pendurada no quadril, canela no joelho (cápsulas afuniladas)
     const thighs: TransformNode[] = [];
     const knees: TransformNode[] = [];
     for (const side of [-1, 1]) {
       const thigh = node('sold-thigh', hips, [side * 0.1, 0, 0]);
       P()
-        .box([0.15, THIGH, 0.17], [0, -THIGH / 2, 0], 'uniform')
-        .box([0.06, 0.12, 0.12], [side * 0.08, -THIGH * 0.45, 0], attack ? 'uniform' : 'vest') // bolso lateral
+        .limb([0, 0.02, 0], [0, -THIGH, 0], 0.17, 'uniform', 0.13)
+        .box([0.05, 0.13, 0.12], [side * 0.085, -THIGH * 0.45, 0], attack ? 'uniform' : 'vest') // bolso lateral
         .build(`sold-thigh-${c.id}`, thigh, material);
       const knee = node('sold-knee', thigh, [0, -THIGH, 0]);
       P()
-        .box([0.13, SHIN, 0.14], [0, -SHIN / 2, 0], 'uniform')
-        .box([0.15, 0.12, 0.06], [0, -0.05, 0.08], 'gear') // joelheira
-        .box([0.14, 0.14, 0.17], [0, -SHIN + 0.04, 0.01], 'boots') // cano da bota
-        .box([0.14, SOLE, 0.26], [0, -SHIN - SOLE / 2, 0.05], 'boots') // sola
+        .limb([0, 0, 0], [0, -SHIN + 0.1, 0], 0.13, 'uniform', 0.11)
+        .box([0.14, 0.12, 0.06], [0, -0.05, 0.07], 'gear', [0, 0, 0], 0.025) // joelheira
+        .box([0.13, 0.15, 0.16], [0, -SHIN + 0.045, 0.005], 'boots', [0, 0, 0], 0.04) // cano da bota
+        .box([0.13, SOLE, 0.27], [0, -SHIN - SOLE / 2, 0.05], 'boots', [0, 0, 0], 0.02) // sola
         .build(`sold-shin-${c.id}`, knee, material);
       thighs.push(thigh);
       knees.push(knee);

@@ -110,5 +110,7 @@ Regras que sustentam a evolução para multiplayer:
    - ✅ Arma em primeira pessoa: fuzil original em partes (culatra, guarda-mão, trilho, mira de ponto vermelho, cano, quebra-chamas, carregador, coronha), mãos com luva e manga camuflada; câmera própria com FOV de 47° (proporção natural sem estreitar a visão); recarga em etapas (inclina, solta o pente, mão busca outro, encaixa); cápsulas ejetadas; clarão em estrela aditivo
    - ✅ Opção Gráficos altos / Leve (sem sombras e relevo, resolução 1x); `?graficos=leve`
    - ✅ Soldados procedurais: modelados por código em peças low-poly com textura-atlas por equipe (defesa: azul-marinho, colete coiote, capacete e óculos âmbar; ataque: camuflado bege, colete oliva, capuz, boné e mochila); animados por articulações (passada que acompanha a velocidade, agachar dobrando joelhos, tronco e cabeça seguindo a mira, queda ao morrer); sombra de contato sob os pés. 8 draw calls por soldado
+   - ✅ Segunda passada de arte: peças com quinas arredondadas e normais suaves (gerador próprio `roundedBox`), membros em cápsulas afuniladas, capacete em cúpula, mãos com dedos, fuzil com trilho dentado, carregador curvo, tubo da coronha e mira tubular; relevo (normal map) no uniforme dos soldados
+   - ✅ Tela no iPhone: altura medida em JS (`--app-h`) e motor redimensionado por ResizeObserver; acabou a faixa vazia embaixo e a imagem esticada
    - Personagens finais em .glb (Meshy/Tripo + Mixamo), se vierem: entram no lugar de `CombatantViews` sem mudar a simulação
    - Sons gravados

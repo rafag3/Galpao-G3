@@ -125,7 +125,7 @@ export class GameRenderer {
     buildSiteSigns(scene, level.bombsites ?? []);
     this.targets = new TargetViews(scene, targets);
     this.impacts = new ImpactDecals(scene);
-    this.combatants = new CombatantViews(scene);
+    this.combatants = new CombatantViews(scene, this.quality === 'high');
     this.bomb = new BombView(scene);
     this.viewModel = new ViewModel(scene, this.camera);
     scene.setRenderingAutoClearDepthStencil(1, true);

@@ -7,7 +7,7 @@ import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Vector4 } from '@babylonjs/core/Maths/math.vector';
 import type { Scene } from '@babylonjs/core/scene';
 import type { Team } from '../../sim/Combatant';
-import { fbm, hex, mix, render } from './ProceduralTextures';
+import { fbm, hex, mix, render, type TexturePair } from './ProceduralTextures';
 import * as W from './WeaponTextures';
 
 /** Células do atlas (4 colunas x 2 linhas). */
@@ -27,54 +27,64 @@ const COLS = 4;
 const ROWS = 2;
 const CELL = 128;
 
-/** Tecido simples com ruído (colete, mochila, botas). */
-function fabric(base: string, dark: string, seed: number) {
+/** Tecido com trama e fitas MOLLE em relevo (colete, mochila). */
+function fabric(base: string, dark: string, seed: number): TexturePair {
   return render((u, v) => {
     const n = fbm(u, v, 4, 3, seed);
     const weave = (Math.sin(u * 160) + Math.sin(v * 160)) * 0.25 + 0.5;
-    // Fitas MOLLE horizontais
     const molle = ((v * 6) % 1) < 0.12 ? 1 : 0;
-    return { c: mix(hex(base), hex(dark), n * 0.5 + weave * 0.15 + molle * 0.35), h: 0 };
-  }, 1, CELL).color;
+    return { c: mix(hex(base), hex(dark), n * 0.5 + weave * 0.15 + molle * 0.35), h: weave * 0.25 + molle * 0.5 };
+  }, 2, CELL);
 }
 
-const solid = (base: string, dark: string, seed: number) =>
-  render((u, v) => ({ c: mix(hex(base), hex(dark), fbm(u, v, 4, 3, seed) * 0.6), h: 0 }), 1, CELL).color;
+/** Material liso com leve irregularidade (capacete, botas, luvas). */
+const solid = (base: string, dark: string, seed: number): TexturePair =>
+  render((u, v) => {
+    const n = fbm(u, v, 4, 3, seed);
+    return { c: mix(hex(base), hex(dark), n * 0.6), h: n * 0.2 };
+  }, 1, CELL);
 
-function cells(team: Team): Record<AtlasCell, HTMLCanvasElement> {
+function cells(team: Team): Record<AtlasCell, TexturePair> {
   if (team === 'defense') {
     return {
-      uniform: W.sleeveDefense().color,
+      uniform: W.sleeveDefense(),
       vest: fabric('#6e5a3e', '#4d3f2b', 301),
       gear: solid('#1d1f22', '#0f1012', 303), // capacete, luvas, joelheiras
       boots: solid('#1a1a1a', '#0c0c0c', 305),
       mask: solid('#151515', '#0a0a0a', 307),
-      gun: W.parkerized().color,
+      gun: W.parkerized(),
       lens: solid('#c98a2a', '#8a5a18', 309), // óculos âmbar
       pack: fabric('#2e3f5c', '#1f2c42', 311),
     };
   }
   return {
-    uniform: W.sleeveAttack().color,
+    uniform: W.sleeveAttack(),
     vest: fabric('#5d6142', '#40432c', 321),
     gear: solid('#2a2721', '#17150f', 323), // luvas, joelheiras
     boots: solid('#8a7656', '#5f5039', 325),
     mask: solid('#121212', '#080808', 327),
-    gun: W.parkerized().color,
+    gun: W.parkerized(),
     lens: solid('#2a2e33', '#14171a', 329), // óculos escuros
     pack: fabric('#6b6a48', '#4a4930', 331), // mochila + capuz
   };
 }
 
-export function buildAtlas(scene: Scene, team: Team): DynamicTexture {
-  const tex = new DynamicTexture(`soldier-atlas-${team}`, { width: COLS * CELL, height: ROWS * CELL }, scene, true, Texture.TRILINEAR_SAMPLINGMODE);
-  const ctx = tex.getContext() as CanvasRenderingContext2D;
-  for (const [cell, canvas] of Object.entries(cells(team)) as [AtlasCell, HTMLCanvasElement][]) {
+/** Cor e relevo (normal map) do uniforme de uma equipe, no mesmo layout. */
+export function buildAtlas(scene: Scene, team: Team): { color: DynamicTexture; normal: DynamicTexture } {
+  const make = (kind: 'color' | 'normal') =>
+    new DynamicTexture(`soldier-${kind}-${team}`, { width: COLS * CELL, height: ROWS * CELL }, scene, true, Texture.TRILINEAR_SAMPLINGMODE);
+  const color = make('color');
+  const normal = make('normal');
+  const cc = color.getContext() as CanvasRenderingContext2D;
+  const nc = normal.getContext() as CanvasRenderingContext2D;
+  for (const [cell, pair] of Object.entries(cells(team)) as [AtlasCell, TexturePair][]) {
     const [c, r] = LAYOUT[cell];
-    ctx.drawImage(canvas, c * CELL, r * CELL, CELL, CELL);
+    cc.drawImage(pair.color, c * CELL, r * CELL, CELL, CELL);
+    nc.drawImage(pair.normal, c * CELL, r * CELL, CELL, CELL);
   }
-  tex.update();
-  return tex;
+  color.update();
+  normal.update();
+  return { color, normal };
 }
 
 /**

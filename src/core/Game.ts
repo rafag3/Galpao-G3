@@ -24,6 +24,7 @@ import { inSite } from '../sim/RoundSystem';
 import { StartOverlay } from '../ui/StartOverlay';
 import { FixedStepLoop } from './FixedStepLoop';
 import { settings } from './Settings';
+import { trackViewport } from './viewport';
 
 export const isTouchDevice = () =>
   window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -146,8 +147,7 @@ export class Game {
       if (this.running && !touch) this.keyboard?.requestLock();
     });
 
-    window.addEventListener('resize', () => this.renderer.resize());
-    window.addEventListener('orientationchange', () => this.renderer.resize());
+    trackViewport(this.canvas, () => this.renderer.resize());
 
     this.renderer.engine.runRenderLoop(() => this.frame());
 

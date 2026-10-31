@@ -27,20 +27,20 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 100dvh: no Safari, 100% / inset:0 incluem a área sob as barras do
-   navegador, o que cortava o joystick e os botões de baixo */
+/* Altura medida em JS (--app-h, ver core/viewport.ts); 100dvh é só o valor
+   inicial. 100% / inset:0 incluiriam a área sob as barras do Safari. */
 #game {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 100dvh;
+  height: var(--app-h, 100dvh);
   display: block;
   touch-action: none;
   outline: none;
 }
 
-#ui { position: fixed; top: 0; left: 0; width: 100%; height: 100dvh; pointer-events: none; }
+#ui { position: fixed; top: 0; left: 0; width: 100%; height: var(--app-h, 100dvh); pointer-events: none; }
 #ui > * { pointer-events: auto; }
 
 /* Mira dinâmica: abre com a dispersão real da arma */
@@ -598,26 +598,29 @@ body.menu-open :is(.minimap, .hud-gear, .kill-feed, .ally-tags, .round-board, .b
 .ammo-nums { white-space: nowrap; }
 .weapon-name { grid-column: 1 / -1; font-size: 11px; font-weight: 600; color: var(--muted); }
 
-/* Vida: embaixo, no centro */
+/* Vida: barra fina rente à base, no centro (não cobre a arma) */
 .hud-health {
   position: absolute;
   left: 50%;
-  bottom: calc(22px + var(--safe-b));
+  bottom: calc(6px + var(--safe-b));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  column-gap: 10px;
-  width: 200px;
-  padding: 5px 12px 6px;
-  border-radius: 8px;
+  column-gap: 8px;
+  width: 230px;
+  padding: 2px 10px;
+  border-radius: 6px;
   background: var(--panel);
   pointer-events: none !important;
   z-index: 5;
 }
+.hud-health .health-value { font-size: 17px; }
 .hud-health .health-track { margin: 0; }
-.hud-health .hud-score { grid-column: 1 / -1; margin: 0; }
-.debug-hud { bottom: calc(2px + var(--safe-b)); padding: 1px 6px; font-size: 10px; opacity: 0.6; }
+.hud-health .hud-score { margin: 0; font-size: 10px; white-space: nowrap; }
+/* FPS ao lado da engrenagem */
+.debug-hud { left: calc(196px + var(--safe-l)); top: calc(18px + var(--safe-t)); bottom: auto; transform: none; padding: 2px 6px; font-size: 10px; opacity: 0.6; }
+@media (max-height: 360px) { .debug-hud { left: calc(176px + var(--safe-l)); } }
 
 /* Nomes sobre os aliados */
 .ally-tags { position: absolute; inset: 0; pointer-events: none !important; z-index: 3; overflow: hidden; }

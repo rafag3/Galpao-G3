@@ -1,4 +1,5 @@
-// Arma em primeira pessoa: fuzil original montado em partes, mãos e mangas
+// Arma em primeira pessoa: fuzil original montado em partes arredondadas, mãos
+// com dedos e mangas
 // do uniforme, recarga animada por etapas, cápsulas ejetadas e clarão.
 //
 // Fica no grupo de render 1 (desenhado por cima do cenário): não atravessa
@@ -8,8 +9,7 @@
 import type { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
 import { Constants } from '@babylonjs/core/Engines/constants';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
-import { Vector3 } from '@babylonjs/core/Maths/math.vector';
-import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
+import { Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { CreateCylinder } from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
 import { CreatePlane } from '@babylonjs/core/Meshes/Builders/planeBuilder';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
@@ -21,6 +21,7 @@ import type { Scene } from '@babylonjs/core/scene';
 import type { Team } from '../sim/Combatant';
 import type { WeaponState } from '../sim/WeaponController';
 import type { TexturePair } from './art/ProceduralTextures';
+import { roundedBox } from './art/Shapes';
 import * as W from './art/WeaponTextures';
 
 /** Camada exclusiva da arma: desenhada só pela câmera da arma. */
@@ -78,58 +79,91 @@ export class ViewModel {
     this.sleeve = sleeve;
     this.team = team;
 
-    // ---- Fuzil (eixo +Z = cano). Medidas em metros.
+    // ---- Fuzil (eixo +Z = cano). Medidas em metros. Peças com quinas
+    // arredondadas: o reflexo corre pelas bordas como em peça moldada/usinada.
     this.group(this.gun, polymer, [
-      [0.052, 0.062, 0.25, 0, -0.012, 0.31], // guarda-mão
-      [0.04, 0.1, 0.05, 0, -0.085, -0.075, -0.35], // empunhadura
-      [0.042, 0.06, 0.17, 0, -0.012, -0.24], // coronha
-      [0.046, 0.09, 0.03, 0, -0.02, -0.33], // soleira
+      [0.054, 0.064, 0.25, 0, -0.012, 0.31], // guarda-mão
+      [0.042, 0.064, 0.15, 0, -0.016, -0.25], // coronha
+      [0.048, 0.092, 0.032, 0, -0.022, -0.335], // soleira
       [0.03, 0.03, 0.08, 0, -0.045, -0.15, 0.25], // ligação coronha
+    ]);
+    // Empunhadura inclinada, num quadro próprio (a mão direita se fecha nela)
+    const grip = new TransformNode('vm-grip', scene);
+    grip.parent = this.gun;
+    grip.position.set(0, -0.085, -0.075);
+    grip.rotation.x = -0.35;
+    this.group(grip, polymer, [
+      [0.038, 0.1, 0.048, 0, 0, 0], // empunhadura
+      [0.042, 0.012, 0.054, 0, -0.051, 0.002], // base
     ]);
     this.group(this.gun, metal, [
       [0.056, 0.064, 0.24, 0, 0, 0.02], // caixa da culatra
       [0.05, 0.03, 0.1, 0, -0.045, 0.06], // poço do carregador
       [0.012, 0.012, 0.03, 0.03, 0.02, -0.05], // alavanca de manejo
       [0.006, 0.03, 0.05, 0, -0.06, -0.02], // guarda-mato
-      [0.03, 0.032, 0.045, 0, 0.057, 0.045], // corpo da mira
-      [0.016, 0.022, 0.03, 0, 0.042, 0.04], // base da mira
-      [0.004, 0.026, 0.07, -0.03, 0.008, 0.05], // tampa da janela de ejeção (lado visível)
-      [0.004, 0.014, 0.018, -0.03, -0.022, -0.04], // seletor de tiro
+      [0.02, 0.016, 0.034, 0, 0.044, 0.045], // base da mira
+      [0.005, 0.026, 0.07, -0.03, 0.008, 0.05], // tampa da janela de ejeção (lado visível)
+      [0.005, 0.014, 0.018, -0.03, -0.022, -0.04], // seletor de tiro
+      [0.008, 0.026, 0.01, 0, 0.032, 0.44], // massa de mira
     ]);
-    this.group(this.gun, rail, [
-      [0.03, 0.012, 0.42, 0, 0.037, 0.18], // trilho superior
-    ]);
+    // Encaixes M-LOK nas laterais do guarda-mão
+    const slots: Part[] = [];
+    for (const z of [0.23, 0.29, 0.35]) for (const x of [-0.028, 0.028]) slots.push([0.004, 0.012, 0.035, x, -0.014, z]);
+    // Trilho superior com os dentes (picatinny)
+    const rails: Part[] = [[0.026, 0.01, 0.42, 0, 0.036, 0.18], ...slots];
+    for (let z = -0.02; z <= 0.39; z += 0.021) rails.push([0.029, 0.004, 0.008, 0, 0.042, z]);
+    this.group(this.gun, rail, rails);
     this.cylinders(this.gun, metal, [
       [0.017, 0.2, 0, 0, 0.53], // cano
       [0.028, 0.055, 0, 0, MUZZLE_Z - 0.03], // quebra-chamas
       [0.026, 0.03, 0, 0, 0.43], // bloco de gases
+      [0.03, 0.12, 0, -0.008, -0.17], // tubo da coronha
+      [0.036, 0.052, 0, 0.062, 0.046], // tubo da mira de ponto vermelho
     ]);
 
     // Lente da mira: vidro escuro com ponto vermelho
-    const lens = CreatePlane('vm-lens', { size: 0.024 }, scene);
-    lens.position.set(0, 0.058, 0.0222);
+    const lens = CreatePlane('vm-lens', { size: 0.03 }, scene);
+    lens.position.set(0, 0.062, 0.0195);
     lens.rotation.y = Math.PI;
     lens.material = this.lensMaterial();
     this.attach(lens, this.gun);
 
-    // Carregador (animado na recarga)
-    this.mag = CreateBox('vm-mag', { width: 0.03, height: 0.13, depth: 0.065 }, scene);
+    // Carregador curvo em três gomos (animado na recarga como peça única)
+    const segs = [0, 1, 2].map((i) => {
+      const b = roundedBox('mg', { width: 0.03, height: 0.05, depth: 0.064, radius: 0.007, uvScale: 8 }, scene);
+      b.position.set(0, 0.04 - i * 0.045, i * i * 0.006 + i * 0.004);
+      b.rotation.x = -i * 0.13;
+      return b;
+    });
+    const plate = roundedBox('mp', { width: 0.034, height: 0.012, depth: 0.07, radius: 0.004, uvScale: 8 }, scene);
+    plate.position.set(0, -0.066, 0.03);
+    plate.rotation.x = -0.32;
+    this.mag = Mesh.MergeMeshes([...segs, plate], true)!;
+    this.mag.name = 'vm-mag';
     this.mag.material = metal;
     this.attach(this.mag, this.gun);
 
-    // ---- Mão direita na empunhadura + antebraço (move com a arma)
-    this.group(this.gun, glove, [
-      [0.07, 0.085, 0.085, 0.012, -0.085, -0.075, -0.35], // mão
-      [0.02, 0.02, 0.06, -0.018, -0.045, -0.02, 0, 0, 0.3], // dedo no gatilho
+    // ---- Mão direita fechada na empunhadura + antebraço (move com a arma)
+    this.group(grip, glove, [
+      [0.024, 0.088, 0.078, 0.031, 0.004, -0.004], // dorso da mão (lado de fora)
+      [0.07, 0.019, 0.024, 0.006, 0.016, 0.036], // dedo médio
+      [0.07, 0.018, 0.023, 0.006, -0.005, 0.035], // anelar
+      [0.064, 0.016, 0.021, 0.008, -0.025, 0.032], // mínimo
+      [0.02, 0.022, 0.06, -0.027, 0.04, 0.0, 0.2], // polegar
+      [0.018, 0.018, 0.055, 0.004, 0.05, 0.05, -0.5], // indicador no gatilho
     ]);
-    this.group(this.gun, sleeve, [this.forearm(new Vector3(0.015, -0.12, -0.11), new Vector3(0.09, -0.26, -0.42), 0.085)]);
+    this.limb(this.gun, sleeve, new Vector3(0.02, -0.12, -0.11), new Vector3(0.09, -0.26, -0.42), 0.072, 0.09);
+    this.limb(this.gun, glove, new Vector3(0.017, -0.115, -0.1), new Vector3(0.024, -0.13, -0.13), 0.078, 0.078); // punho da luva
 
-    // ---- Mão esquerda no guarda-mão (vai buscar o carregador)
+    // ---- Mão esquerda segurando o guarda-mão por baixo (vai buscar o carregador)
     this.leftHand = new TransformNode('vm-left', scene);
     this.leftHand.parent = this.gun;
     this.leftHand.position.copyFrom(LEFT_HAND_POS);
-    this.group(this.leftHand, glove, [[0.085, 0.07, 0.11, 0, -0.01, 0]]);
-    this.group(this.leftHand, sleeve, [this.forearm(new Vector3(-0.02, -0.04, -0.04), new Vector3(-0.22, -0.2, -0.3), 0.08)]);
+    const fingers: Part[] = [[0.062, 0.024, 0.095, 0, -0.012, 0]]; // palma por baixo
+    for (const z of [-0.03, -0.01, 0.01, 0.03]) fingers.push([0.017, 0.05, 0.017, 0.032, 0.016, z, 0, 0, -0.15]); // dedos subindo pela lateral
+    fingers.push([0.018, 0.04, 0.055, -0.032, 0.012, 0.005, 0, 0, 0.2]); // polegar do outro lado
+    this.group(this.leftHand, glove, fingers);
+    this.limb(this.leftHand, sleeve, new Vector3(-0.02, -0.035, -0.04), new Vector3(-0.22, -0.2, -0.3), 0.068, 0.085);
 
     // ---- Clarão: três planos cruzados com textura em estrela, aditivos
     this.flash = this.buildFlash();
@@ -166,6 +200,8 @@ export class ViewModel {
   private material(name: string, pair: TexturePair, specular: number): StandardMaterial {
     const tex = (n: string, c: HTMLCanvasElement) => {
       const t = new DynamicTexture(n, c, this.scene, true, Texture.TRILINEAR_SAMPLINGMODE);
+      // UV em metros (caixas arredondadas): a textura se repete pela peça
+      t.wrapU = t.wrapV = Texture.WRAP_ADDRESSMODE;
       t.update();
       return t;
     };
@@ -186,10 +222,10 @@ export class ViewModel {
     m.isPickable = false;
   }
 
-  /** Funde várias caixas numa malha só (1 draw call) presa a `parent`. */
+  /** Funde várias caixas arredondadas numa malha só (1 draw call) presa a `parent`. */
   private group(parent: TransformNode, mat: StandardMaterial, parts: Part[]): void {
     const meshes = parts.map(([w, h, d, x, y, z, rx = 0, ry = 0, rz = 0]) => {
-      const b = CreateBox('p', { width: w, height: h, depth: d }, this.scene);
+      const b = roundedBox('p', { width: w, height: h, depth: d, radius: Math.min(w, h, d) * 0.3, uvScale: 8 }, this.scene);
       b.position.set(x, y, z);
       b.rotation.set(rx, ry, rz);
       return b;
@@ -202,7 +238,7 @@ export class ViewModel {
   /** Cilindros ao longo de +Z: [diâmetro, comprimento, x, y, z]. */
   private cylinders(parent: TransformNode, mat: StandardMaterial, parts: [number, number, number, number, number][]) {
     const meshes = parts.map(([dia, len, x, y, z]) => {
-      const c = CreateCylinder('c', { diameter: dia, height: len, tessellation: 10 }, this.scene);
+      const c = CreateCylinder('c', { diameter: dia, height: len, tessellation: 16 }, this.scene);
       c.rotation.x = Math.PI / 2;
       c.position.set(x, y, z);
       return c;
@@ -212,14 +248,14 @@ export class ViewModel {
     this.attach(merged, parent);
   }
 
-  /** Antebraço como caixa alongada entre dois pontos. */
-  private forearm(from: Vector3, to: Vector3, thickness: number): Part {
+  /** Antebraço: cilindro afunilado entre dois pontos (punho mais fino que o cotovelo). */
+  private limb(parent: TransformNode, mat: StandardMaterial, from: Vector3, to: Vector3, dFrom: number, dTo: number): void {
     const d = to.subtract(from);
-    const len = d.length();
-    const mid = from.add(d.scale(0.5));
-    const ry = Math.atan2(d.x, d.z);
-    const rx = -Math.atan2(d.y, Math.hypot(d.x, d.z));
-    return [thickness, thickness, len, mid.x, mid.y, mid.z, rx, ry, 0];
+    const c = CreateCylinder('l', { height: d.length(), diameterTop: dTo, diameterBottom: dFrom, tessellation: 14 }, this.scene);
+    c.position.copyFrom(from.add(d.scale(0.5)));
+    c.rotationQuaternion = Quaternion.FromUnitVectorsToRef(Vector3.Up(), d.normalize(), new Quaternion());
+    c.material = mat;
+    this.attach(c, parent);
   }
 
   private lensMaterial(): StandardMaterial {
