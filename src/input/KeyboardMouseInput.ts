@@ -85,6 +85,7 @@ export class KeyboardMouseInput implements InputSource {
     // Ctrl foi evitado de propósito: Ctrl+W fecha a aba do navegador.
     into.crouch ||= this.has('KeyC');
     into.fire ||= this.mouseFire;
+    into.use ||= this.has('KeyE');
   }
 
   consumeLook() {

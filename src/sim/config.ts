@@ -80,3 +80,23 @@ export const BOT = {
   repathSeconds: 1,
   arriveRadius: 0.7,
 };
+
+/** Regras de rodada (CS simplificado, tempos encurtados para celular). */
+export const ROUND = {
+  freezeSeconds: 3,
+  roundSeconds: 90,
+  bombSeconds: 35,
+  plantSeconds: 3,
+  defuseSeconds: 5,
+  /** Distância máxima até a bomba para desarmar. */
+  defuseRange: 1.6,
+  /** Passar a menos disto de uma bomba caída a pega. */
+  pickupRange: 1.2,
+  postRoundSeconds: 5,
+  winsToMatch: 5,
+  /** Explosão: letal até `lethalRadius`, dano cai a zero em `maxRadius`. */
+  explosionLethalRadius: 8,
+  explosionMaxRadius: 20,
+  /** Quem planta/desarma precisa estar quase parado. */
+  maxUseSpeed: 0.6,
+};

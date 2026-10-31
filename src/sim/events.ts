@@ -15,7 +15,18 @@ export type SimEvent =
   | { type: 'dryFire'; shooter: EntityId }
   | { type: 'reloadStart'; shooter: EntityId; duration: number }
   | { type: 'reloadEnd'; shooter: EntityId }
-  | { type: 'respawn'; id: EntityId };
+  | { type: 'respawn'; id: EntityId }
+  | { type: 'roundStart'; round: number }
+  | { type: 'freezeEnd' }
+  | { type: 'bombPickup'; by: EntityId }
+  | { type: 'bombDropped'; position: Vec3 }
+  | { type: 'bombPlanted'; by: EntityId; site: 'A' | 'B'; position: Vec3 }
+  | { type: 'bombDefused'; by: EntityId }
+  | { type: 'bombExploded'; position: Vec3 }
+  | { type: 'roundEnd'; winner: 'attack' | 'defense'; reason: RoundEndReason }
+  | { type: 'matchEnd'; winner: 'attack' | 'defense' };
+
+export type RoundEndReason = 'elimination' | 'bomb' | 'defused' | 'time';
 
 export class EventQueue {
   private events: SimEvent[] = [];

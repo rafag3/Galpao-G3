@@ -152,8 +152,8 @@ export const galpao: LevelData = {
   spawn: { x: 36 + OX, y: 0.5, z: 6 + OZ },
   spawnYaw: 0,
   bombsites: [
-    { id: 'A', ...toArea(SITE_A) },
-    { id: 'B', ...toArea(SITE_B) },
+    { id: 'A', ...toArea(SITE_A), plantSpot: [13 + OX, 52 + OZ] },
+    { id: 'B', ...toArea(SITE_B), plantSpot: [61 + OX, 51 + OZ] },
   ],
   spawnZones: { attack: toArea([30, 2, 42, 10]), defense: toArea([30, 54, 42, 62]) },
 };

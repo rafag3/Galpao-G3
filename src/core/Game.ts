@@ -10,11 +10,13 @@ import { GameRenderer } from '../render/GameRenderer';
 import { LOOK, MOVE, SIM_DT } from '../sim/config';
 import { viewOf } from '../sim/Combatant';
 import type { EntityId, SimEvent } from '../sim/events';
-import { GameSim } from '../sim/GameSim';
+import { GameSim, type SimOptions } from '../sim/GameSim';
 import { clamp, lerp, type Vec3 } from '../sim/math';
 import { initPhysics } from '../sim/PhysicsWorld';
 import { DebugHud } from '../ui/DebugHud';
 import { Hud } from '../ui/Hud';
+import { RoundHud } from '../ui/RoundHud';
+import { inSite } from '../sim/RoundSystem';
 import { StartOverlay } from '../ui/StartOverlay';
 import { FixedStepLoop } from './FixedStepLoop';
 
@@ -30,6 +32,7 @@ export class Game {
   private keyboard?: KeyboardMouseInput;
   private debug?: DebugHud;
   private hud?: Hud;
+  private roundHud?: RoundHud;
   private instrumentation?: SceneInstrumentation;
   private running = false;
   /** Visão local do jogador: atualizada a cada frame, enviada à sim a cada tick. */
@@ -47,9 +50,9 @@ export class Game {
     private readonly uiRoot: HTMLElement,
   ) {}
 
-  async init(level: LevelData): Promise<void> {
+  async init(level: LevelData, simOptions: SimOptions = {}): Promise<void> {
     await initPhysics();
-    this.sim = new GameSim(level);
+    this.sim = new GameSim(level, Date.now() % 100000, simOptions);
     this.renderer = new GameRenderer(this.canvas, level, this.sim.targets.targets);
     this.currEye = this.prevEye = this.sim.player.eyePosition();
     this.view = { yaw: level.spawnYaw, pitch: 0 };
@@ -75,6 +78,12 @@ export class Game {
     });
 
     this.hud = new Hud(this.uiRoot);
+    if (this.sim.rounds) {
+      this.roundHud = new RoundHud(this.uiRoot, () => {
+        this.sim.restartMatch();
+        this.input.clearLatched();
+      });
+    }
     this.debug = new DebugHud(this.uiRoot);
     this.instrumentation = new SceneInstrumentation(this.renderer.scene);
 
@@ -135,6 +144,13 @@ export class Game {
         game.view = { yaw, pitch: 0 };
         game.currEye = game.prevEye = game.sim.player.eyePosition();
       },
+      get round() {
+        const r = game.sim.rounds;
+        return r && { ...structuredClone(r.state), bomb: structuredClone(r.bomb) };
+      },
+      restartMatch() {
+        game.sim.restartMatch();
+      },
       get running() {
         return game.running;
       },
@@ -191,7 +207,32 @@ export class Game {
           this.currEye = this.prevEye = this.sim.player.eyePosition();
         }
         break;
+      case 'bombPlanted':
+        this.sound.bombEvent(true);
+        break;
+      case 'bombDefused':
+        this.sound.bombEvent(false);
+        break;
+      case 'bombExploded': {
+        this.renderer.bomb.explode();
+        const me = this.sim.player.eyePosition();
+        const d = Math.hypot(e.position.x - me.x, e.position.z - me.z);
+        this.sound.explosion(Math.min(1, 15 / Math.max(15, d)));
+        if (d < 35) this.roundHud?.explosion();
+        break;
+      }
+      case 'roundEnd':
+        this.roundHud?.showRoundEnd(e.winner, e.reason);
+        this.sound.roundEnd(e.winner === this.sim.human.team);
+        break;
+      case 'matchEnd':
+        if (this.sim.rounds) this.roundHud?.showMatchEnd(e.winner, this.sim.rounds.state);
+        break;
       case 'reloadEnd':
+      case 'roundStart':
+      case 'freezeEnd':
+      case 'bombPickup':
+      case 'bombDropped':
         break;
     }
   }
@@ -243,10 +284,24 @@ export class Game {
       human.health,
       human.maxHealth,
       human.alive,
-      human.respawnSeconds - (this.sim.time - human.diedAt),
+      this.sim.rounds ? -1 : human.respawnSeconds - (this.sim.time - human.diedAt),
       human.kills,
       human.deaths,
     );
+
+    const rounds = this.sim.rounds;
+    if (rounds) {
+      const bomb = rounds.bomb;
+      const canPlant =
+        rounds.state.phase === 'live' &&
+        human.alive &&
+        bomb.status === 'carried' &&
+        bomb.carrier === human.id &&
+        !!inSite(rounds.bombsites, p.feet);
+      document.body.classList.toggle('can-plant', canPlant);
+      this.roundHud?.update(dt, rounds.state, bomb, this.sim.combatants(), human, canPlant);
+      if (this.renderer.bomb.update(dt, bomb)) this.sound.beep();
+    }
     this.debug?.update(dt, this.renderer.engine, p, this.instrumentation?.drawCallsCounter.current ?? 0);
   }
 }

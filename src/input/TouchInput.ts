@@ -28,6 +28,7 @@ export class TouchInput implements InputSource {
   private readonly firePointers = new Set<number>();
   private pressed: PressedActions = noPressed();
   private crouchToggled = false;
+  private useHeld = false;
 
   constructor(parent: HTMLElement) {
     const opts = { signal: this.abort.signal };
@@ -43,9 +44,10 @@ export class TouchInput implements InputSource {
     const fireBtn = button('touch-btn btn-fire', 'Atirar');
     const reloadBtn = button('touch-btn btn-reload', 'Recarregar');
     const jumpBtn = button('touch-btn btn-jump', 'Pular');
+    const useBtn = button('touch-btn btn-use', 'Plantar');
     const crouchBtn = button('touch-btn btn-crouch', 'Agachar');
 
-    this.root.append(moveZone, lookZone, fireBtn, reloadBtn, jumpBtn, crouchBtn);
+    this.root.append(moveZone, lookZone, fireBtn, reloadBtn, jumpBtn, crouchBtn, useBtn);
     parent.append(this.root);
 
     // ---- Joystick flutuante: nasce onde o polegar toca
@@ -107,6 +109,20 @@ export class TouchInput implements InputSource {
       btn.addEventListener('pointercancel', end, opts);
     }
 
+    // Plantar: segurar (só aparece quando dá para plantar, via body.can-plant)
+    useBtn.addEventListener(
+      'pointerdown',
+      (e) => {
+        e.preventDefault();
+        useBtn.setPointerCapture(e.pointerId);
+        this.useHeld = true;
+      },
+      opts,
+    );
+    const endUse = () => (this.useHeld = false);
+    useBtn.addEventListener('pointerup', endUse, opts);
+    useBtn.addEventListener('pointercancel', endUse, opts);
+
     tapButton(reloadBtn, () => (this.pressed.reload = true), opts);
     tapButton(jumpBtn, () => (this.pressed.jump = true), opts);
     // Agachar alterna: segurar um botão ocuparia o polegar da mira
@@ -165,6 +181,7 @@ export class TouchInput implements InputSource {
     into.run ||= Math.hypot(this.joyVec.x, this.joyVec.y) >= RUN_THRESHOLD;
     into.crouch ||= this.crouchToggled;
     into.fire ||= this.firePointers.size > 0;
+    into.use ||= this.useHeld;
   }
 
   consumeLook() {

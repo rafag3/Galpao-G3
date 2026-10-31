@@ -20,7 +20,7 @@ export class StartOverlay {
     this.root.innerHTML = `
       <div class="start-card">
         <h1>Galpão G3</h1>
-        <p class="phase">Fase 2 — combate</p>
+        <p class="phase">Modo bomba · 3 contra 3</p>
         <button type="button" class="start-btn">Jogar</button>
         <div class="settings">
           <label>Sensibilidade ${opts.isTouch ? 'do toque' : 'do mouse'}
@@ -35,7 +35,7 @@ export class StartOverlay {
         <p class="hint">${
           opts.isTouch
             ? 'Polegar esquerdo move (no limite corre). Arraste à direita para mirar. O botão Atirar também mira enquanto pressionado.'
-            : 'WASD move · Shift corre · Espaço pula · C agacha · Clique atira · R recarrega · Esc pausa'
+            : 'WASD move · Shift corre · Espaço pula · C agacha · Clique atira · R recarrega · E (segurar) planta · Esc pausa'
         }</p>
       </div>`;
     parent.append(this.root);

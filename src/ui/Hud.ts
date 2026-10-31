@@ -51,7 +51,7 @@ export class Hud {
     parent.append(this.vignette, this.crosshair, this.hitmarker, this.ammo, this.health, this.death);
   }
 
-  /** Vida, placar pessoal e tela de morte. */
+  /** Vida, placar pessoal e tela de morte (`respawnIn` < 0 = modo rodadas). */
   updateStatus(dt: number, health: number, maxHealth: number, alive: boolean, respawnIn: number, kills: number, deaths: number): void {
     if (health !== this.lastHealth) {
       this.healthValue.textContent = String(Math.ceil(health));
@@ -64,7 +64,9 @@ export class Hud {
     this.vignette.style.opacity = String(Math.min(1, this.hurtTimer * 3));
     this.death.classList.toggle('show', !alive);
     this.crosshair.style.visibility = alive ? 'visible' : 'hidden';
-    if (!alive) this.death.textContent = `Eliminado · renascendo em ${Math.max(0, Math.ceil(respawnIn))}`;
+    if (!alive)
+      this.death.textContent =
+        respawnIn < 0 ? 'Eliminado · aguardando a próxima rodada' : `Eliminado · renascendo em ${Math.max(0, Math.ceil(respawnIn))}`;
   }
 
   showHurt(): void {

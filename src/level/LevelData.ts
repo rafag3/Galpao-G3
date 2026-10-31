@@ -43,6 +43,8 @@ export interface Area {
 
 export interface Bombsite extends Area {
   id: 'A' | 'B';
+  /** Ponto onde os bots plantam (livre de caixas). Padrão: centro do site. */
+  plantSpot?: [number, number];
 }
 
 /** Posto de vigia de um bot: onde fica e para onde olha. */

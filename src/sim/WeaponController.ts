@@ -115,6 +115,18 @@ export class WeaponController {
     if (!input.fire && s.sinceLastShot > def.recoil.recoveryDelay) s.shotsFired = 0;
   }
 
+  /** Nova rodada: pente e reserva cheios, sem recarga ou recuo pendente. */
+  refill(): void {
+    const s = this.state;
+    s.mag = s.def.magSize;
+    s.reserve = Math.max(s.reserve, s.def.reserve);
+    s.reloading = false;
+    s.reloadProgress = 0;
+    s.recoilPitch = s.recoilYaw = 0;
+    this.reloadTimer = 0;
+    this.cooldown = 0;
+  }
+
   /** Dispersão atual em radianos (exposta para a mira dinâmica do HUD). */
   currentSpread(player: PlayerState): number {
     const sp = this.state.def.spread;

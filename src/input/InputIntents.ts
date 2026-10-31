@@ -16,6 +16,8 @@ export interface MoveIntent {
   fire: boolean;
   /** Pedido de recarga. Consumido pelo tick. */
   reload: boolean;
+  /** Botão de ação segurado (plantar / desarmar). */
+  use: boolean;
   /** Ângulos de visão absolutos (radianos). */
   yaw: number;
   pitch: number;
@@ -29,6 +31,7 @@ export const emptyIntent = (yaw = 0, pitch = 0): MoveIntent => ({
   jump: false,
   fire: false,
   reload: false,
+  use: false,
   yaw,
   pitch,
 });

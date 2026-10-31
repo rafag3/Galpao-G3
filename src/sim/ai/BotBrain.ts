@@ -1,9 +1,13 @@
 // Cérebro de um bot. Lê o mundo (visão por raycast, tiros ouvidos, informação
 // da equipe) e produz o MESMO MoveIntent que o input do jogador produz.
 //
+// O "o quê" vem de fora: o comandante da equipe define um Objective (ir ao
+// posto, ao site, plantar, desarmar, proteger a bomba). O cérebro decide o
+// "como": caminhar, vigiar, perseguir, combater.
+//
 // Estados:
-//   toPost  → caminha até o posto de vigia
-//   hold    → vigia uma direção, varrendo o olhar
+//   toGoal  → caminha até o ponto do objetivo
+//   hold    → no ponto: vigia (varrendo o olhar) ou executa a ação (plantar/desarmar)
 //   chase   → vai à última posição conhecida do inimigo
 //   combat  → inimigo visível: mira com tempo de reação e erro, atira em rajadas
 
@@ -18,7 +22,22 @@ import { NavGrid, type Point2 } from '../nav/NavGrid';
 import { PhysicsWorld, RAPIER } from '../PhysicsWorld';
 import type { Rng } from '../rng';
 
-export type BotState = 'toPost' | 'hold' | 'chase' | 'combat';
+export type BotState = 'toGoal' | 'hold' | 'chase' | 'combat';
+
+export interface Objective {
+  point: Point2;
+  /** Direção a vigiar ao chegar. */
+  watchYaw: number;
+  /** Ao chegar, segura o botão de ação (plantar/desarmar). */
+  use?: boolean;
+  /** Pode largar o objetivo para apoiar um colega (padrão: sim, se não for `use`). */
+  canRespond?: boolean;
+}
+
+export const objectiveFromPost = (post: BotPost): Objective => ({
+  point: { x: post.position[0], z: post.position[1] },
+  watchYaw: post.watchYaw,
+});
 
 /** Informação compartilhada pela equipe (comportamento simples de equipe). */
 export interface TeamMemory {
@@ -54,7 +73,7 @@ const wrap = (a: number) => {
 const dist2 = (a: Point2, b: Point2) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export class BotBrain {
-  state: BotState = 'toPost';
+  state: BotState = 'toGoal';
   /** Visão atual do bot (o que vai no intent). */
   yaw = 0;
   pitch = 0;
@@ -84,16 +103,25 @@ export class BotBrain {
   private readonly sweepPhase: number;
 
   constructor(
-    readonly post: BotPost,
+    public objective: Objective,
     index: number,
   ) {
     this.visionTimer = index * 0.05; // escalona os raycasts entre bots
     this.sweepPhase = index * 2.1;
   }
 
+  /** Troca o objetivo; ignora mudanças pequenas para não ficar recalculando. */
+  setObjective(o: Objective): void {
+    const cur = this.objective;
+    const changed = dist2(cur.point, o.point) > 1 || !!cur.use !== !!o.use;
+    this.objective = o;
+    if (!changed) return;
+    if (this.state === 'hold' || (o.use && this.state === 'chase')) this.state = 'toGoal';
+  }
+
   /** Chamado ao (re)nascer. */
   reset(yaw: number): void {
-    this.state = 'toPost';
+    this.state = 'toGoal';
     this.yaw = yaw;
     this.pitch = 0;
     this.path = [];
@@ -217,9 +245,11 @@ export class BotBrain {
       this.state = 'chase';
     }
 
-    // Apoio de equipe: só o bot designado larga o posto
+    // Apoio de equipe: só o bot designado larga o objetivo
+    const canRespond = this.objective.canRespond ?? !this.objective.use;
     if (
-      (this.state === 'hold' || this.state === 'toPost') &&
+      canRespond &&
+      (this.state === 'hold' || this.state === 'toGoal') &&
       team.responder === self.id &&
       team.lastKnown &&
       time - team.at < BOT.teamInfoSeconds
@@ -232,16 +262,15 @@ export class BotBrain {
       const arrived = this.lastKnown && dist2(feet, this.lastKnown) < 1.5;
       if (arrived && !this.lookAroundUntil) this.lookAroundUntil = time + 2;
       if (time > this.chaseUntil || (this.lookAroundUntil && time > this.lookAroundUntil)) {
-        this.state = 'toPost';
+        this.state = 'toGoal';
         this.lastKnown = null;
         if (team.responder === self.id) team.responder = null;
       }
     }
 
-    if (this.state === 'toPost') {
-      const post = { x: this.post.position[0], z: this.post.position[1] };
-      if (dist2(feet, post) < BOT.arriveRadius) this.state = 'hold';
-    }
+    if (this.state === 'toGoal' && dist2(feet, this.objective.point) < BOT.arriveRadius) this.state = 'hold';
+    // Empurrado para fora do ponto (ou ponto mudou de lugar): volta
+    if (this.state === 'hold' && dist2(feet, this.objective.point) > BOT.arriveRadius * 3) this.state = 'toGoal';
   }
 
   // ------------------------------------------------------------------- ação
@@ -293,11 +322,9 @@ export class BotBrain {
         break;
       }
       case 'chase':
-      case 'toPost': {
+      case 'toGoal': {
         const goal =
-          this.state === 'chase' && this.lastKnown
-            ? { x: this.lastKnown.x, z: this.lastKnown.z }
-            : { x: this.post.position[0], z: this.post.position[1] };
+          this.state === 'chase' && this.lastKnown ? { x: this.lastKnown.x, z: this.lastKnown.z } : this.objective.point;
         const dir = this.follow(ctx, goal);
         if (dir) {
           desiredYaw = Math.atan2(dir.x, dir.z);
@@ -310,8 +337,14 @@ export class BotBrain {
         break;
       }
       case 'hold': {
-        desiredYaw = this.post.watchYaw + Math.sin(time * 0.6 + this.sweepPhase) * 0.55;
-        if (weapon.mag < weapon.def.magSize) intent.reload = true;
+        if (this.objective.use) {
+          // Plantando/desarmando: parado, segurando a ação
+          intent.use = true;
+          desiredYaw = this.objective.watchYaw;
+        } else {
+          desiredYaw = this.objective.watchYaw + Math.sin(time * 0.6 + this.sweepPhase) * 0.55;
+          if (weapon.mag < weapon.def.magSize) intent.reload = true;
+        }
         break;
       }
     }

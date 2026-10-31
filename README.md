@@ -2,9 +2,18 @@
 
 FPS tático 3D original para navegador, com foco em celular (touch, horizontal) e suporte a PC (teclado e mouse).
 
-**Estado atual:** Fase 4 — você (ataque) contra 3 bots da defesa no mapa **Galpão** (72 × 64 m, dois bombsites, três rotas). Os bots navegam até seus postos, vigiam, reagem, perseguem, ouvem tiros e pedem apoio. O campo de testes com alvos abre com `?mapa=teste`.
+**Estado atual:** Fase 5 — **modo bomba 3 contra 3** no mapa Galpão. Você e 2 aliados bots no ataque contra 3 bots da defesa; primeiro a 5 rodadas vence.
 
-**Modo de jogo (alvo):** como o Counter-Strike — o ataque planta a bomba em A ou B; a defesa impede ou desarma.
+| Regra | Valor |
+|---|---|
+| Preparação / rodada | 3 s / 1:30 |
+| Plantar / desarmar | 3 s / 5 s segurando a ação, quase parado |
+| Bomba | 35 s; letal até 8 m |
+| Ataque vence | elimina a defesa ou a bomba explode |
+| Defesa vence | elimina o ataque antes do plantio, tempo esgota ou desarma |
+| Morte | volta só na próxima rodada |
+
+Parâmetros de URL: `?mapa=teste` (campo de treino com alvos e respawn), `?bots=0` (sem bots, para testar regras).
 
 ## Stack
 
@@ -35,8 +44,9 @@ npm run build    # typecheck + build de produção em dist/
 | Mirar | Mouse (clique para capturar, Esc solta) | Arrastar na metade direita |
 | Pular | Espaço | Botão **Pular** |
 | Agachar | C (segurar) | Botão **Agachar** (alterna) |
-| Atirar | Clique esquerdo (segurar = automático) | **Atirar** à direita (também mira enquanto pressionado) ou à esquerda |
+| Atirar | Clique esquerdo (segurar = automático) | **Atirar** (também mira enquanto pressionado) |
 | Recarregar | R | Botão **Recarregar** (ou automático ao atirar sem bala) |
+| Plantar | E (segurar) | Botão **Plantar** (aparece no site com a bomba) |
 
 Ctrl não é usado para agachar porque Ctrl+W fecha a aba.
 
@@ -46,9 +56,10 @@ Ctrl não é usado para agachar porque Ctrl+W fecha a aba.
 src/
   core/      Game (orquestra), FixedStepLoop (tick fixo de 60 Hz), Settings
   input/     InputIntents (contrato), teclado/mouse, touch, InputManager
-  sim/       GameSim, Combatant, PlayerController, WeaponController, HitRegistry,
+  sim/       GameSim, RoundSystem (rodadas e bomba), Combatant, PlayerController, WeaponController, HitRegistry,
              TargetSystem, PhysicsWorld, weapons (dados), events, rng
-    ai/      BotBrain: estados posto → vigia → perseguição → combate
+    ai/      TeamCommander: objetivos por equipe (posto, site, plantar,
+             desarmar, buscar bomba, proteger); BotBrain executa e combate
     nav/     NavGrid: grade de 0,5 m gerada do nível, A* + suavização
              ← sim/ inteiro: sem Babylon, sem DOM
   render/    GameRenderer, ViewModel, TargetViews, ImpactDecals: só leem o estado
@@ -83,6 +94,6 @@ Regras que sustentam a evolução para multiplayer:
 2. ✅ Arma hitscan, cadência, dano por parte do corpo, dispersão, recuo, recarga, alvos com respawn, sons provisórios
 3. ✅ Blockout do mapa Galpão: rotas validadas por teste (A ~11 s, B ~9,5 s, estreita ~9 s, defesa ~4 s)
 4. ✅ Bots: navegação A* em grade, visão por raycast (sem atravessar paredes), reação de 0,6 s, erro de mira que assenta, rajadas, audição de tiros, um bot de apoio por avistamento, anti-travamento
-5. Rodadas, placar e bomba
-6. HUD final, menu e opções
+5. ✅ Rodadas e bomba: plantar/desarmar/explodir, queda e coleta da bomba, aliados bots, desarme e retomada pela defesa, placar, fim de partida
+6. HUD final, menu e opções; troca de lado (jogar na defesa)
 7. Arte final (low-poly semi-realista, GLB + KTX2, lightmaps)

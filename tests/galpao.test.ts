@@ -166,7 +166,7 @@ describe('mapa Galpão', () => {
   });
 
   it('jogador nasce no chão, livre, e consegue andar', () => {
-    const sim = new GameSim(galpao, 1, { bots: false });
+    const sim = new GameSim(galpao, 1, { bots: false, rounds: false });
     for (let i = 0; i < SIM_HZ; i++) sim.tick(emptyIntent(galpao.spawnYaw));
     const s = sim.player.state;
     expect(s.grounded).toBe(true);

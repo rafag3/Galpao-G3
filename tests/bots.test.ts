@@ -13,6 +13,8 @@ beforeAll(async () => {
   await initPhysics();
 });
 
+// Comportamento individual dos bots, sem rodadas nem aliados
+const NO_ROUNDS = { rounds: false, allies: 0 };
 const OX = -36;
 const OZ = -32;
 const plan = (x: number, y: number) => ({ x: x + OX, y: 0.05, z: y + OZ });
@@ -28,7 +30,7 @@ function run(sim: GameSim, seconds: number, intent: Partial<MoveIntent> = {}, ev
 
 /** Sim com o jogador estacionado longe de tudo (spawn do ataque) e bots nos postos. */
 function simWithBotsPosted() {
-  const sim = new GameSim(galpao);
+  const sim = new GameSim(galpao, 1, NO_ROUNDS);
   run(sim, 10);
   return sim;
 }
@@ -39,12 +41,12 @@ describe('bots', () => {
     for (const b of sim.bots) {
       expect(b.brain.state, b.combatant.id).toBe('hold');
       const f = b.combatant.controller.state.feet;
-      expect(Math.hypot(f.x - b.brain.post.position[0], f.z - b.brain.post.position[1])).toBeLessThan(1);
+      expect(Math.hypot(f.x - b.brain.objective.point.x, f.z - b.brain.objective.point.z)).toBeLessThan(1);
     }
   });
 
   it('não enxergam através das paredes: jogador no spawn não leva tiro', () => {
-    const sim = new GameSim(galpao);
+    const sim = new GameSim(galpao, 1, NO_ROUNDS);
     const ev = run(sim, 25);
     expect(ev.filter((e) => e.type === 'hit' && e.victim === 'player')).toHaveLength(0);
     expect(sim.human.alive).toBe(true);
@@ -116,8 +118,8 @@ describe('bots', () => {
   });
 
   it('é determinístico com bots', () => {
-    const a = new GameSim(galpao, 7);
-    const b = new GameSim(galpao, 7);
+    const a = new GameSim(galpao, 7, NO_ROUNDS);
+    const b = new GameSim(galpao, 7, NO_ROUNDS);
     for (const sim of [a, b]) {
       run(sim, 6);
       sim.human.controller.teleport(plan(33, 34), 0);

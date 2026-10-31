@@ -160,7 +160,7 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 /* Debug */
 .debug-hud {
   position: absolute;
-  top: calc(6px + var(--safe-t));
+  bottom: calc(4px + var(--safe-b));
   left: 50%;
   transform: translateX(-50%);
   opacity: 0.8;
@@ -227,6 +227,11 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 .btn-jump { right: calc(30px + var(--safe-r)); bottom: calc(22px + var(--safe-b)); width: 64px; height: 64px; }
 .btn-crouch { right: calc(32px + var(--safe-r)); bottom: calc(106px + var(--safe-b)); width: 60px; height: 60px; }
 .btn-crouch.on { background: rgba(255, 122, 47, 0.6); border-color: var(--orange); }
+
+/* Plantar: só aparece no site com a bomba */
+.btn-use { display: none; right: calc(210px + var(--safe-r)); bottom: calc(26px + var(--safe-b)); width: 84px; height: 84px; font-size: 13px; border-color: #ffb347; background: rgba(255, 179, 71, 0.35); }
+body.can-plant .btn-use { display: block; }
+.btn-use:active { background: rgba(255, 179, 71, 0.75); }
 
 /* Telas baixas (celular na horizontal com barra do navegador) */
 @media (max-height: 360px) {
@@ -301,3 +306,67 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
   z-index: 8;
 }
 .death-screen.show { display: grid; }
+
+/* Placar da rodada */
+.round-board {
+  position: absolute;
+  top: calc(8px + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none !important;
+  z-index: 5;
+}
+.round-board .team, .round-board .clock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--panel);
+}
+.round-board .team.atk { border-radius: 8px 0 0 8px; border-bottom: 3px solid var(--orange); }
+.round-board .team.def { border-radius: 0 8px 8px 0; border-bottom: 3px solid var(--blue); }
+.round-board .score { font-size: 22px; font-weight: 800; }
+.round-board .alive { font-size: 11px; letter-spacing: 1px; color: var(--muted); }
+.round-board .clock { min-width: 92px; justify-content: center; font-size: 16px; font-weight: 700; }
+.round-board .clock.bomb { color: #ff4d4d; }
+
+.bomb-chip, .round-alert, .use-progress, .round-banner {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none !important;
+  z-index: 6;
+  display: none;
+}
+.bomb-chip {
+  top: calc(52px + var(--safe-t));
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 122, 47, 0.25);
+  border: 1px solid var(--orange);
+  font-size: 12px;
+  font-weight: 600;
+}
+.bomb-chip.in-site { background: rgba(255, 179, 71, 0.6); }
+.round-alert { top: calc(82px + var(--safe-t)); font-size: 14px; font-weight: 700; text-shadow: 0 1px 3px #000; }
+.round-alert.danger { color: #ff4d4d; }
+.use-progress { top: 60%; width: 220px; text-align: center; font-size: 13px; font-weight: 700; text-shadow: 0 1px 3px #000; }
+.use-progress .track { height: 8px; margin-top: 4px; border-radius: 4px; background: rgba(0, 0, 0, 0.5); overflow: hidden; }
+.use-progress .fill { height: 100%; background: #ffb347; transform-origin: left; transform: scaleX(0); }
+.round-banner {
+  top: 32%;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 22px;
+  font-weight: 800;
+  background: var(--panel);
+}
+.round-banner.win { border-bottom: 4px solid var(--orange); }
+.round-banner.loss { border-bottom: 4px solid var(--blue); }
+.bomb-chip.show, .round-alert.show, .use-progress.show, .round-banner.show { display: block; }
+.explosion-flash { position: absolute; inset: 0; background: #fff6e0; opacity: 0; pointer-events: none !important; z-index: 9; }
+.overlay.match-over h1 { font-size: 44px; }

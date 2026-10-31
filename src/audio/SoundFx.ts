@@ -77,6 +77,45 @@ export class SoundFx {
     this.tone('sine', 140, 0.7 * gain, 0.12, t, 45);
   }
 
+  /** Bipe da bomba plantada. */
+  beep(): void {
+    if (!this.ctx) return;
+    this.tone('square', 2200, 0.08, 0.06, this.ctx.currentTime);
+  }
+
+  /** Bomba plantada / desarmada: dois tons. */
+  bombEvent(planted: boolean): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.tone('triangle', planted ? 660 : 990, 0.25, 0.15, t);
+    this.tone('triangle', planted ? 990 : 660, 0.25, 0.2, t + 0.16);
+  }
+
+  explosion(gain: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = 0.35; // ruído esticado = estrondo grave e longo
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1800, t);
+    lp.frequency.exponentialRampToValueAtTime(120, t + 0.9);
+    src.connect(lp).connect(this.envelope(Math.min(1, gain), 0.005, 1, t));
+    src.start(t);
+    src.stop(t + 1.1);
+    this.tone('sine', 70, Math.min(1, gain), 0.8, t, 30);
+  }
+
+  /** Fim de rodada: subida (vitória) ou descida (derrota). */
+  roundEnd(won: boolean): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const notes = won ? [523, 659, 784] : [523, 415, 330];
+    notes.forEach((f, i) => this.tone('triangle', f, 0.22, 0.25, t + i * 0.14));
+  }
+
   /** Jogador levou dano. */
   hurt(): void {
     if (!this.ctx) return;

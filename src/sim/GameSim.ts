@@ -1,10 +1,15 @@
 // Estado completo da partida. Recebe o intent do jogador, gera os dos bots,
 // avança ticks e emite eventos. Não conhece render, DOM ou dispositivo:
 // roda no navegador ou no Node.
+//
+// Dois modos:
+//   rodadas  → mapa com bombsites e zonas de spawn (Galpão): plantar/desarmar
+//   treino   → sem rodadas (campo de testes): todos renascem sozinhos
 
 import type { MoveIntent } from '../input/InputIntents';
-import type { LevelData } from '../level/LevelData';
-import { BotBrain, type Noise, type TeamMemory } from './ai/BotBrain';
+import type { Area, LevelData } from '../level/LevelData';
+import { BotBrain, type Noise, objectiveFromPost, type TeamMemory } from './ai/BotBrain';
+import { TeamCommander } from './ai/TeamCommander';
 import { type Combatant, type Team } from './Combatant';
 import { COMBAT, SIM_DT } from './config';
 import { type EntityId, EventQueue, type HitPart, type SimEvent } from './events';
@@ -14,6 +19,7 @@ import { NavGrid } from './nav/NavGrid';
 import { PhysicsWorld } from './PhysicsWorld';
 import { PlayerController } from './PlayerController';
 import { Rng } from './rng';
+import { RoundSystem } from './RoundSystem';
 import { TargetSystem } from './TargetSystem';
 import { WeaponController } from './WeaponController';
 import { RIFLE } from './weapons';
@@ -23,6 +29,17 @@ export interface Bot {
   brain: BotBrain;
 }
 
+export interface SimOptions {
+  /** false = sem nenhum bot. */
+  bots?: boolean;
+  /** Aliados bots do jogador no ataque (padrão 2: partida 3x3). */
+  allies?: number;
+  /** false = desliga rodadas mesmo em mapa competitivo. */
+  rounds?: boolean;
+}
+
+const emptyMemory = (): TeamMemory => ({ lastKnown: null, at: -99, spotter: null, responder: null });
+
 export class GameSim {
   readonly physics: PhysicsWorld;
   readonly hits = new HitRegistry();
@@ -30,20 +47,20 @@ export class GameSim {
   readonly targets: TargetSystem;
   readonly human: Combatant;
   readonly bots: Bot[] = [];
+  readonly rounds: RoundSystem | null = null;
+  private readonly commander: TeamCommander | null = null;
   private readonly events = new EventQueue();
   private readonly rng: Rng;
-  private readonly teams: Record<Team, TeamMemory> = {
-    attack: { lastKnown: null, at: -99, spotter: null, responder: null },
-    defense: { lastKnown: null, at: -99, spotter: null, responder: null },
-  };
+  private teams: Record<Team, TeamMemory> = { attack: emptyMemory(), defense: emptyMemory() };
   private noises: Noise[] = [];
+  private commanderTimer = 0;
   tickCount = 0;
 
   /** Requer `await initPhysics()` antes. */
   constructor(
     readonly level: LevelData,
     seed = 1,
-    opts: { bots?: boolean } = {},
+    opts: SimOptions = {},
   ) {
     this.rng = new Rng(seed);
     this.physics = new PhysicsWorld(level);
@@ -52,20 +69,46 @@ export class GameSim {
 
     this.human = this.createCombatant('player', 'attack', level.spawn, level.spawnYaw, COMBAT.playerHealth, COMBAT.playerRespawnSeconds);
 
-    if (opts.bots !== false && level.defensePosts && level.spawnZones) {
-      const z = level.spawnZones.defense;
-      level.defensePosts.forEach((post, i) => {
-        // Nascem espalhados no spawn da defesa e caminham até o posto
-        const x = z.min[0] + ((i + 1) / (level.defensePosts!.length + 1)) * (z.max[0] - z.min[0]);
-        const spawn = { x, y: 0.5, z: (z.min[1] + z.max[1]) / 2 };
-        const c = this.createCombatant(`bot:${i}`, 'defense', spawn, Math.PI, COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
-        const brain = new BotBrain(post, i);
+    const zones = level.spawnZones;
+    if (opts.bots !== false && level.defensePosts && zones) {
+      let n = 0;
+      level.defensePosts.forEach((post) => {
+        const c = this.createCombatant(`bot:${n}`, 'defense', this.spawnPoint(zones.defense, n, level.defensePosts!.length), Math.PI, COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
+        const brain = new BotBrain(objectiveFromPost(post), n);
         brain.reset(Math.PI);
         this.bots.push({ combatant: c, brain });
+        n++;
       });
+      const allies = opts.allies ?? 2;
+      for (let i = 0; i < allies; i++) {
+        const spawn = this.spawnPoint(zones.attack, i + 1, allies + 1);
+        const c = this.createCombatant(`bot:${n}`, 'attack', spawn, 0, COMBAT.botHealth, COMBAT.botRespawnSeconds, 9999);
+        const brain = new BotBrain({ point: { x: spawn.x, z: spawn.z }, watchYaw: 0 }, n);
+        brain.reset(0);
+        this.bots.push({ combatant: c, brain });
+        n++;
+      }
+    }
+
+    if (opts.rounds !== false && level.bombsites?.length && zones) {
+      this.commander = new TeamCommander(level, this.nav);
+      this.rounds = new RoundSystem(
+        level,
+        { combatants: () => this.combatants(), kill: (c) => this.kill(c, null), resetPositions: () => this.resetPositions() },
+        this.events,
+        () => this.human.id,
+      );
+      this.rounds.startRound();
+      this.commander.onRoundStart(this.rng);
     }
     // Um step inicial para o broad-phase registrar os colliders estáticos
     this.physics.step(SIM_DT);
+  }
+
+  /** Posição `i` de `n` espalhada ao longo da zona de spawn. */
+  private spawnPoint(zone: Area, i: number, n: number): Vec3 {
+    const x = zone.min[0] + ((i + 1) / (n + 1)) * (zone.max[0] - zone.min[0]);
+    return { x, y: 0.05, z: (zone.min[1] + zone.max[1]) / 2 };
   }
 
   private createCombatant(
@@ -123,7 +166,7 @@ export class GameSim {
     return [this.human, ...this.bots.map((b) => b.combatant)];
   }
 
-  private find(id: EntityId): Combatant | undefined {
+  find(id: EntityId): Combatant | undefined {
     return id === 'player' ? this.human : this.bots.find((b) => b.combatant.id === id)?.combatant;
   }
 
@@ -140,30 +183,74 @@ export class GameSim {
     victim.health = Math.max(0, victim.health - damage);
     const killed = victim.health === 0;
     this.events.push({ type: 'hit', attacker, victim: victim.id, part: hit.part, damage, killed });
-    if (killed) {
-      victim.alive = false;
-      victim.diedAt = this.time;
-      victim.deaths++;
-      if (killer) killer.kills++;
-      victim.controller.setActive(false);
-    }
+    if (killed) this.kill(victim, killer ?? null);
   }
 
-  private respawn(c: Combatant): void {
-    c.controller.teleport(c.respawnAt, c.respawnYaw);
+  /** Mata um combatente (tiro ou explosão). */
+  kill(victim: Combatant, killer: Combatant | null): void {
+    if (!victim.alive) return;
+    victim.health = 0;
+    victim.alive = false;
+    victim.diedAt = this.time;
+    victim.deaths++;
+    if (killer) killer.kills++;
+    victim.controller.setActive(false);
+  }
+
+  private revive(c: Combatant, at: Vec3, yaw: number): void {
+    c.controller.teleport(at, yaw);
     c.controller.setActive(true);
     c.health = c.maxHealth;
     c.alive = true;
-    this.bots.find((b) => b.combatant === c)?.brain.reset(c.respawnYaw);
+    this.bots.find((b) => b.combatant === c)?.brain.reset(yaw);
     this.events.push({ type: 'respawn', id: c.id });
+  }
+
+  /** Início de rodada: cada equipe na sua zona, vida e munição cheias. */
+  private resetPositions(): void {
+    const zones = this.level.spawnZones!;
+    for (const team of ['attack', 'defense'] as const) {
+      const members = this.combatants().filter((c) => c.team === team);
+      // O humano fica no centro (level.spawn); os bots ocupam as vagas em volta
+      const bots = members.filter((c) => c !== this.human);
+      const slots = members.length;
+      const middle = Math.floor(slots / 2);
+      const free = Array.from({ length: slots }, (_, k) => k).filter((k) => !members.includes(this.human) || k !== middle);
+      members.forEach((c) => {
+        const at = c === this.human ? this.level.spawn : this.spawnPoint(zones[team], free[bots.indexOf(c)], slots);
+        const yaw = team === 'attack' ? this.level.spawnYaw : Math.PI;
+        this.revive(c, at, yaw);
+        c.weapon.refill();
+      });
+    }
+    this.teams = { attack: emptyMemory(), defense: emptyMemory() };
+  }
+
+  /** Recomeça a partida (botão "Jogar de novo"). */
+  restartMatch(): void {
+    if (!this.rounds) return;
+    for (const c of this.combatants()) {
+      c.kills = 0;
+      c.deaths = 0;
+    }
+    this.rounds.restartMatch();
+    this.commander?.onRoundStart(this.rng);
   }
 
   tick(intent: MoveIntent, dt = SIM_DT): void {
     const time = this.time;
     const all = this.combatants();
+    const rounds = this.rounds;
+
+    // Objetivos da equipe (2x por segundo basta)
+    this.commanderTimer -= dt;
+    if (this.commander && rounds && this.commanderTimer <= 0) {
+      this.commanderTimer = 0.5;
+      this.commander.update(this.bots, this.human, rounds.bomb);
+    }
 
     // Intents: humano vem de fora; bots pensam com o estado do tick anterior
-    const intents = new Map<Combatant, MoveIntent>([[this.human, intent]]);
+    const intents = new Map<Combatant, MoveIntent>([[this.human, { ...intent }]]);
     this.updateResponders();
     for (const bot of this.bots) {
       if (!bot.combatant.alive) continue;
@@ -185,9 +272,12 @@ export class GameSim {
       );
     }
 
+    rounds?.preStep(intents, dt);
+
     for (const c of all) {
       if (!c.alive) {
-        if (time - c.diedAt >= c.respawnSeconds) this.respawn(c);
+        // Sem rodadas (treino): renasce sozinho
+        if (!rounds && time - c.diedAt >= c.respawnSeconds) this.revive(c, c.respawnAt, c.respawnYaw);
         continue;
       }
       const i = intents.get(c)!;
@@ -197,6 +287,10 @@ export class GameSim {
 
     this.targets.update(time);
     this.physics.step(dt);
+
+    const before = rounds?.state.round;
+    rounds?.postStep(dt);
+    if (rounds && rounds.state.round !== before) this.commander?.onRoundStart(this.rng);
 
     // Tiros deste tick viram "barulho" que os bots ouvem no próximo
     this.noises = this.events
@@ -234,4 +328,3 @@ export class GameSim {
     this.physics.dispose();
   }
 }
-
