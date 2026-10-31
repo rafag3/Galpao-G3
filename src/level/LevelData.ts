@@ -45,6 +45,13 @@ export interface Bombsite extends Area {
   id: 'A' | 'B';
 }
 
+/** Posto de vigia de um bot: onde fica e para onde olha. */
+export interface BotPost {
+  position: [number, number];
+  /** Direção vigiada (radianos; 0 = +Z). */
+  watchYaw: number;
+}
+
 export interface LevelData {
   name: string;
   blocks: Block[];
@@ -56,4 +63,6 @@ export interface LevelData {
   bombsites?: Bombsite[];
   /** Zonas de nascimento das equipes (usadas a partir da Fase 5). */
   spawnZones?: { attack: Area; defense: Area };
+  /** Postos dos bots da defesa. Sem isto, o nível não tem bots. */
+  defensePosts?: BotPost[];
 }

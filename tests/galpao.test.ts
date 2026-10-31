@@ -7,7 +7,7 @@ import { galpao, PROP_BLOCKS, WALKABLE } from '../src/level/galpao';
 import { isWalkable, type PlanRect } from '../src/level/walkableGrid';
 import { BODY, SIM_HZ } from '../src/sim/config';
 import { GameSim } from '../src/sim/GameSim';
-import { initPhysics } from '../src/sim/PhysicsWorld';
+import { initPhysics, PhysicsWorld, RAPIER } from '../src/sim/PhysicsWorld';
 
 beforeAll(async () => {
   await initPhysics();
@@ -143,8 +143,30 @@ describe('mapa Galpão', () => {
     }
   });
 
+  it('nenhum ponto de um spawn enxerga o outro', () => {
+    const physics = new PhysicsWorld(galpao);
+    physics.step(1 / 60);
+    const { attack, defense } = galpao.spawnZones!;
+    const pts = (a: typeof attack) => {
+      const out: { x: number; y: number; z: number }[] = [];
+      for (let x = a.min[0] + 0.5; x < a.max[0]; x += 1)
+        for (let z = a.min[1] + 0.5; z < a.max[1]; z += 1) out.push({ x, y: 1.68, z });
+      return out;
+    };
+    const exposed: string[] = [];
+    for (const a of pts(attack)) {
+      for (const d of pts(defense)) {
+        const v = { x: d.x - a.x, y: 0, z: d.z - a.z };
+        const len = Math.hypot(v.x, v.z);
+        const hit = physics.world.castRay(new RAPIER.Ray(a, { x: v.x / len, y: 0, z: v.z / len }), len, true);
+        if (!hit) exposed.push(`${a.x},${a.z} → ${d.x},${d.z}`);
+      }
+    }
+    expect(exposed.slice(0, 5)).toEqual([]);
+  });
+
   it('jogador nasce no chão, livre, e consegue andar', () => {
-    const sim = new GameSim(galpao);
+    const sim = new GameSim(galpao, 1, { bots: false });
     for (let i = 0; i < SIM_HZ; i++) sim.tick(emptyIntent(galpao.spawnYaw));
     const s = sim.player.state;
     expect(s.grounded).toBe(true);

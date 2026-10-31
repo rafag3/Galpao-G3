@@ -15,6 +15,7 @@ import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
 import type { BlockKind, LevelData } from '../level/LevelData';
 import { quatFromEuler, type Vec3 } from '../sim/math';
 import type { TargetState } from '../sim/TargetSystem';
+import { CombatantViews } from './CombatantViews';
 import { ImpactDecals } from './ImpactDecals';
 import { buildSiteSigns } from './SiteSigns';
 import { TargetViews } from './TargetViews';
@@ -43,6 +44,7 @@ export class GameRenderer {
   readonly viewModel: ViewModel;
   readonly targets: TargetViews;
   readonly impacts: ImpactDecals;
+  readonly combatants: CombatantViews;
 
   constructor(canvas: HTMLCanvasElement, level: LevelData, targets: readonly TargetState[]) {
     this.engine = new Engine(
@@ -78,6 +80,7 @@ export class GameRenderer {
     buildSiteSigns(scene, level.bombsites ?? []);
     this.targets = new TargetViews(scene, targets);
     this.impacts = new ImpactDecals(scene);
+    this.combatants = new CombatantViews(scene);
     this.viewModel = new ViewModel(scene, this.camera);
     scene.setRenderingAutoClearDepthStencil(1, true);
   }

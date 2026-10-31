@@ -38,3 +38,45 @@ export const TARGET = {
   body: { width: 0.5, height: 1.5, depth: 0.3 }, // de y = 0 a 1,5 m
   head: { size: 0.26, centerY: 1.66 },
 };
+
+export const COMBAT = {
+  playerHealth: 100,
+  botHealth: 100,
+  playerRespawnSeconds: 3,
+  botRespawnSeconds: 6,
+};
+
+/**
+ * Parâmetros da IA (dificuldade "normal", calibrada para touch). Ângulos em radianos.
+ * Referência medida: jogador parado a 13 m morre em ~2 s.
+ * Os bots usam a MESMA arma do jogador: dispersão e recuo valem para eles.
+ */
+export const BOT = {
+  /** Tempo entre ver o inimigo e o primeiro tiro. */
+  reactionSeconds: 0.6,
+  viewDistance: 45, // tela de celular: além disso o alvo vira poucos pixels
+  /** Meio-ângulo do campo de visão. */
+  halfFov: (60 * Math.PI) / 180,
+  /** Perto assim, percebe mesmo de costas (passos). */
+  proximitySense: 4,
+  /** Ouve tiros até esta distância. */
+  hearingDistance: 30,
+  /** Intervalo entre checagens de visão (raycast é caro). */
+  visionInterval: 0.15,
+  /** Velocidade máxima de giro da mira. */
+  turnSpeed: 4.5,
+  /** Erro de mira ao avistar → erro após rastrear por `aimSettleSeconds`. */
+  aimErrorStart: 0.1,
+  aimErrorEnd: 0.016,
+  aimSettleSeconds: 2,
+  /** Só atira com a mira a menos disto do alvo. */
+  fireCone: 0.05,
+  burstSeconds: [0.2, 0.45] as const,
+  pauseSeconds: [0.3, 0.65] as const,
+  /** Tempo indo à última posição conhecida antes de desistir. */
+  chaseSeconds: 8,
+  /** Quanto tempo a informação de um avistamento vale para a equipe. */
+  teamInfoSeconds: 6,
+  repathSeconds: 1,
+  arriveRadius: 0.7,
+};

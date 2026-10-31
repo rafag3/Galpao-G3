@@ -259,3 +259,45 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
   .settings { margin-top: 12px; gap: 4px; }
   .start-card .hint { margin-top: 10px; font-size: 12px; }
 }
+
+/* Vida e placar pessoal */
+.hud-health {
+  position: absolute;
+  left: calc(16px + var(--safe-l));
+  top: calc(10px + var(--safe-t));
+  min-width: 150px;
+  padding: 6px 12px 8px;
+  border-radius: 8px;
+  background: var(--panel);
+  pointer-events: none !important;
+  z-index: 5;
+}
+.health-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.health-value::before { content: '+ '; color: var(--muted); font-weight: 600; }
+.health-track { height: 5px; margin-top: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.health-bar { height: 100%; background: var(--blue); transform-origin: left; transition: transform 0.15s; }
+.hud-health.low .health-value { color: #ff4d4d; }
+.hud-health.low .health-bar { background: #ff4d4d; }
+.hud-score { margin-top: 4px; font-size: 11px; color: var(--muted); }
+
+/* Dano recebido e tela de morte */
+.hurt-vignette {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  box-shadow: inset 0 0 120px 30px rgba(220, 30, 30, 0.75);
+  pointer-events: none !important;
+  z-index: 2;
+}
+.death-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(60, 0, 0, 0.35);
+  font-size: 22px;
+  font-weight: 700;
+  pointer-events: none !important;
+  z-index: 8;
+}
+.death-screen.show { display: grid; }

@@ -65,6 +65,10 @@ export class ViewModel {
     m.isPickable = false;
   }
 
+  setVisible(v: boolean): void {
+    this.root.setEnabled(v);
+  }
+
   onShot(): void {
     this.kick = 1;
     this.flashTimer = 0.045;

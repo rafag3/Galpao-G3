@@ -40,6 +40,7 @@ function ticks(sim: GameSim, n: number, intent: Partial<MoveIntent>, events: Sim
 
 const seconds = (s: number) => Math.round(s * SIM_HZ);
 const CENTER_TARGET = 1; // alvo em (0, 17)
+const CENTER_ID = 'target:1';
 const bodyAim = (sim: GameSim) => aimAt(sim, 0, 0.9, 17);
 const headAim = (sim: GameSim) => aimAt(sim, 0, TARGET.head.centerY, 17);
 
@@ -55,7 +56,7 @@ describe('arma', () => {
     const ev = ticks(sim, 1, { ...bodyAim(sim), fire: true });
     expect(sim.weapon.state.mag).toBe(RIFLE.magSize - 1);
     const hit = ev.find((e) => e.type === 'hit');
-    expect(hit).toMatchObject({ type: 'hit', targetId: CENTER_TARGET, part: 'body', damage: RIFLE.damage });
+    expect(hit).toMatchObject({ type: 'hit', attacker: 'player', victim: CENTER_ID, part: 'body', damage: RIFLE.damage });
   });
 
   it('respeita a cadência de tiro (600/min)', () => {
@@ -80,7 +81,7 @@ describe('arma', () => {
     expect(through.find((e) => e.type === 'hit')).toBeUndefined();
 
     ticks(sim, seconds(TARGET.respawnSeconds), {}, ev);
-    expect(ev.some((e) => e.type === 'targetRespawn' && e.targetId === CENTER_TARGET)).toBe(true);
+    expect(ev.some((e) => e.type === 'respawn' && e.id === CENTER_ID)).toBe(true);
     expect(sim.targets.targets[CENTER_TARGET].health).toBe(TARGET.health);
   });
 
@@ -139,6 +140,6 @@ describe('arma', () => {
     const sim = newSim();
     const ev = ticks(sim, 1, { ...aimAt(sim, -3.4, 0.6, 8.5), fire: true }); // alvo atrás das caixas
     expect(ev.find((e) => e.type === 'hit')).toBeUndefined();
-    expect(ev.find((e) => e.type === 'impact')).toMatchObject({ onTarget: false });
+    expect(ev.find((e) => e.type === 'impact')).toMatchObject({ onEntity: false });
   });
 });

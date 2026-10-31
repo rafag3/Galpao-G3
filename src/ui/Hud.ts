@@ -10,6 +10,14 @@ export class Hud {
   private readonly reloadBar: HTMLDivElement;
   private readonly crosshair: HTMLDivElement;
   private readonly hitmarker: HTMLDivElement;
+  private readonly health: HTMLDivElement;
+  private readonly healthValue: HTMLSpanElement;
+  private readonly healthBar: HTMLDivElement;
+  private readonly score: HTMLDivElement;
+  private readonly vignette: HTMLDivElement;
+  private readonly death: HTMLDivElement;
+  private hurtTimer = 0;
+  private lastHealth = -1;
   private hitTimer = 0;
   private lastMag = -1;
   private lastReserve = -1;
@@ -28,7 +36,39 @@ export class Hud {
     this.reloadBar = div('reload-bar');
     this.ammo.append(this.mag, this.reserve, this.reloadBar);
 
-    parent.append(this.crosshair, this.hitmarker, this.ammo);
+    this.health = div('hud-health');
+    this.healthValue = document.createElement('span');
+    this.healthValue.className = 'health-value';
+    const track = div('health-track');
+    this.healthBar = div('health-bar');
+    track.append(this.healthBar);
+    this.score = div('hud-score');
+    this.health.append(this.healthValue, track, this.score);
+
+    this.vignette = div('hurt-vignette');
+    this.death = div('death-screen');
+
+    parent.append(this.vignette, this.crosshair, this.hitmarker, this.ammo, this.health, this.death);
+  }
+
+  /** Vida, placar pessoal e tela de morte. */
+  updateStatus(dt: number, health: number, maxHealth: number, alive: boolean, respawnIn: number, kills: number, deaths: number): void {
+    if (health !== this.lastHealth) {
+      this.healthValue.textContent = String(Math.ceil(health));
+      this.healthBar.style.transform = `scaleX(${health / maxHealth})`;
+      this.health.classList.toggle('low', health <= 30);
+      this.lastHealth = health;
+    }
+    this.score.textContent = `${kills} abates · ${deaths} mortes`;
+    this.hurtTimer = Math.max(0, this.hurtTimer - dt);
+    this.vignette.style.opacity = String(Math.min(1, this.hurtTimer * 3));
+    this.death.classList.toggle('show', !alive);
+    this.crosshair.style.visibility = alive ? 'visible' : 'hidden';
+    if (!alive) this.death.textContent = `Eliminado · renascendo em ${Math.max(0, Math.ceil(respawnIn))}`;
+  }
+
+  showHurt(): void {
+    this.hurtTimer = 0.35;
   }
 
   /**

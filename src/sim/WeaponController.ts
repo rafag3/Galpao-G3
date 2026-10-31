@@ -2,12 +2,12 @@
 // Sem dependência de render: tudo que o jogador vê sai dos eventos.
 
 import { MOVE } from './config';
-import type { EventQueue } from './events';
+import type { EntityId, EventQueue } from './events';
+import type { HitInfo, HitRegistry } from './HitRegistry';
 import { approach, clamp, type Vec3 } from './math';
 import { PhysicsWorld, RAPIER } from './PhysicsWorld';
 import type { PlayerState } from './PlayerController';
 import { Rng } from './rng';
-import type { TargetSystem } from './TargetSystem';
 import type { WeaponDef } from './weapons';
 
 export interface WeaponState {
@@ -37,17 +37,24 @@ export class WeaponController {
   private reloadTimer = 0;
   private triggerWasDown = false;
 
+  /**
+   * @param owner entidade que segura a arma (vai nos eventos)
+   * @param applyDamage aplica o dano na entidade atingida (decidido pela GameSim)
+   */
   constructor(
     def: WeaponDef,
+    private readonly owner: EntityId,
     private readonly physics: PhysicsWorld,
-    private readonly targets: TargetSystem,
+    private readonly hits: HitRegistry,
     private readonly events: EventQueue,
+    private readonly applyDamage: (hit: HitInfo, damage: number) => void,
     private readonly rng = new Rng(),
+    reserve = def.reserve,
   ) {
     this.state = {
       def,
       mag: def.magSize,
-      reserve: def.reserve,
+      reserve,
       reloading: false,
       reloadProgress: 0,
       recoilPitch: 0,
@@ -62,7 +69,6 @@ export class WeaponController {
     player: PlayerState,
     eye: Vec3,
     exclude: RAPIER.Collider,
-    time: number,
     dt: number,
   ): void {
     const s = this.state;
@@ -80,7 +86,7 @@ export class WeaponController {
         s.reserve -= take;
         s.reloading = false;
         s.reloadProgress = 0;
-        this.events.push({ type: 'reloadEnd' });
+        this.events.push({ type: 'reloadEnd', shooter: this.owner });
       }
     } else if (input.reload) {
       this.startReload();
@@ -91,10 +97,10 @@ export class WeaponController {
     // Tolerância: somas de 1/60 acumulam erro de ponto flutuante
     if (triggerPressed && !s.reloading && this.cooldown <= 1e-6) {
       if (s.mag > 0) {
-        this.fire(player, eye, exclude, time);
+        this.fire(player, eye, exclude);
         this.cooldown += def.fireInterval;
       } else if (!this.triggerWasDown) {
-        this.events.push({ type: 'dryFire' });
+        this.events.push({ type: 'dryFire', shooter: this.owner });
         this.startReload(); // recarga automática ao tentar atirar sem bala
       }
     }
@@ -125,10 +131,10 @@ export class WeaponController {
     s.reloading = true;
     s.reloadProgress = 0;
     this.reloadTimer = s.def.reloadTime;
-    this.events.push({ type: 'reloadStart', duration: s.def.reloadTime });
+    this.events.push({ type: 'reloadStart', shooter: this.owner, duration: s.def.reloadTime });
   }
 
-  private fire(player: PlayerState, eye: Vec3, exclude: RAPIER.Collider, time: number): void {
+  private fire(player: PlayerState, eye: Vec3, exclude: RAPIER.Collider): void {
     const s = this.state;
     const def = s.def;
 
@@ -143,7 +149,7 @@ export class WeaponController {
     s.mag--;
     s.shotsFired++;
     s.sinceLastShot = 0;
-    this.events.push({ type: 'shot', origin: eye, direction: dir });
+    this.events.push({ type: 'shot', shooter: this.owner, origin: eye, direction: dir });
 
     // Recuo aplicado DEPOIS do tiro: o primeiro tiro é preciso
     s.recoilPitch = Math.max(s.recoilPitch - def.recoil.pitchPerShot, -def.recoil.maxPitch);
@@ -162,11 +168,11 @@ export class WeaponController {
 
     const t = hit.timeOfImpact;
     const point = { x: eye.x + dir.x * t, y: eye.y + dir.y * t, z: eye.z + dir.z * t };
-    const box = this.targets.hitboxOf(hit.collider);
-    this.events.push({ type: 'impact', point, normal: { ...hit.normal }, onTarget: !!box });
-    if (box) {
-      const damage = box.part === 'head' ? def.damage * def.headshotMultiplier : def.damage;
-      this.targets.applyDamage(box, damage, time);
+    const info = this.hits.resolve(hit.collider, point);
+    this.events.push({ type: 'impact', point, normal: { ...hit.normal }, onEntity: !!info });
+    if (info) {
+      const damage = info.part === 'head' ? def.damage * def.headshotMultiplier : def.damage;
+      this.applyDamage(info, damage);
     }
   }
 }

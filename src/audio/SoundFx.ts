@@ -58,9 +58,10 @@ export class SoundFx {
     o.stop(at + decay + 0.05);
   }
 
-  shot(): void {
+  /** @param gain 1 = tiro do próprio jogador; menor = tiro distante */
+  shot(gain = 1): void {
     const ctx = this.ctx;
-    if (!ctx) return;
+    if (!ctx || gain < 0.02) return;
     const t = ctx.currentTime;
     // Estampido: ruído filtrado com queda rápida + grave curto
     const src = ctx.createBufferSource();
@@ -70,10 +71,17 @@ export class SoundFx {
     lp.type = 'lowpass';
     lp.frequency.setValueAtTime(5000, t);
     lp.frequency.exponentialRampToValueAtTime(600, t + 0.18);
-    src.connect(lp).connect(this.envelope(0.9, 0.002, 0.2, t));
+    src.connect(lp).connect(this.envelope(0.9 * gain, 0.002, 0.2, t));
     src.start(t);
     src.stop(t + 0.3);
-    this.tone('sine', 140, 0.7, 0.12, t, 45);
+    this.tone('sine', 140, 0.7 * gain, 0.12, t, 45);
+  }
+
+  /** Jogador levou dano. */
+  hurt(): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.tone('sawtooth', 220, 0.18, 0.12, t, 90);
   }
 
   dryFire(): void {

@@ -153,6 +153,40 @@ export class PlayerController {
     return !blocked;
   }
 
+  /** Altura (y) a partir da qual um tiro conta como na cabeça. */
+  headLineY(): number {
+    return this.state.feet.y + this.height - 0.3;
+  }
+
+  /** Altura do peito, onde os bots miram. */
+  chestY(): number {
+    return this.state.feet.y + this.height * 0.68;
+  }
+
+  /** Liga/desliga a presença física (morto não colide nem leva tiro). */
+  setActive(active: boolean): void {
+    this.collider.setEnabled(active);
+  }
+
+  /** Reposiciona (respawn): de pé, parado, olhando para `yaw`. */
+  teleport(feet: Vec3, yaw: number): void {
+    const s = this.state;
+    if (s.crouching) {
+      s.crouching = false;
+      this.height = BODY.standHeight;
+      this.collider.setHalfHeight(halfHeightFor(this.height));
+    }
+    const center = { x: feet.x, y: feet.y + this.height / 2, z: feet.z };
+    this.body.setTranslation(center, true);
+    this.body.setNextKinematicTranslation(center);
+    s.feet = { ...feet };
+    s.velocity = vec3();
+    s.yaw = yaw;
+    s.pitch = 0;
+    s.grounded = false;
+    s.eyeHeight = BODY.standHeight - BODY.eyeFromTop;
+  }
+
   /** Posição dos olhos (para a câmera). */
   eyePosition(): Vec3 {
     const f = this.state.feet;

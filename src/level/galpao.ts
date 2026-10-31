@@ -10,7 +10,7 @@
 //   3. Estreita, galpão → B .......... ~51 m, ~8 s (passagem de 2 m)
 // Defesa chega a qualquer bombsite em ~4 s.
 
-import type { Area, Block, BlockKind, LevelData, TargetSpawn } from './LevelData';
+import type { Area, Block, BlockKind, BotPost, LevelData } from './LevelData';
 import { solidBlocks, type PlanRect } from './walkableGrid';
 
 const W = 72;
@@ -30,7 +30,8 @@ export const WALKABLE: Record<string, PlanRect> = {
   bombsiteB: [52, 36, 70, 60],
   caminhoes: [54, 16, 70, 36],
   galpao: [22, 22, 50, 42],
-  portaSulGalpao: [33, 16, 39, 22],
+  // Fora do eixo do mid: evita linha de visão direta entre os spawns
+  portaSulGalpao: [40, 16, 46, 22],
   midNorte: [33, 42, 39, 54],
   passagemEstreita: [50, 38, 52, 40],
 };
@@ -63,7 +64,7 @@ function marking(r: PlanRect): Block {
 }
 
 const toArea = ([x0, y0, x1, y1]: PlanRect): Area => ({ min: [x0 + OX, y0 + OZ], max: [x1 + OX, y1 + OZ] });
-const target = (px: number, py: number, yaw = Math.PI): TargetSpawn => ({ position: [px + OX, py + OZ], yaw });
+const post = (px: number, py: number, watchYaw: number): BotPost => ({ position: [px + OX, py + OZ], watchYaw });
 
 const SITE_A: PlanRect = [4, 46, 20, 60];
 const SITE_B: PlanRect = [54, 38, 68, 58];
@@ -99,7 +100,9 @@ const props: Block[] = [
   crate(36.6, 31, 1),
   crate(31, 37),
   pillar(29, 34, WALL_H),
-  pillar(43, 27, WALL_H),
+  // Contêiner logo após a porta sul: quebra a linha de visão até o mid
+  containerEW(42, 26),
+  pillar(47, 31, WALL_H),
   pillar(36, 38, WALL_H),
 
   // Mid norte (conexão galpão ↔ defesa)
@@ -138,14 +141,13 @@ export const galpao: LevelData = {
     marking(SITE_B),
     ...props,
   ],
-  // Alvos no lugar de defensores (até os bots chegarem na Fase 4)
-  targets: [
-    target(9, 56),
-    target(18, 50),
-    target(60, 52),
-    target(66, 42),
-    target(36, 50),
-    target(30, 38),
+  // No mapa de competição os bots da defesa ocupam o lugar dos alvos
+  targets: [],
+  // Defesa: um no A, um no B e um no mid. Saem do spawn e caminham até o posto.
+  defensePosts: [
+    post(13, 54, Math.PI), // A: vigia a saída do corredor oeste
+    post(62, 51, Math.PI), // B: vigia a entrada dos caminhões e a passagem estreita
+    post(36, 47, Math.PI), // mid: vigia a porta norte do galpão
   ],
   spawn: { x: 36 + OX, y: 0.5, z: 6 + OZ },
   spawnYaw: 0,

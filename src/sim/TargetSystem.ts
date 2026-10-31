@@ -1,9 +1,10 @@
-// Alvos de treino com hitbox de corpo e de cabeça. Servem de base para o
-// sistema de dano dos bots na Fase 4 (mesmo mapeamento collider → parte).
+// Alvos de treino estáticos com hitbox de corpo e de cabeça. No mapa de
+// competição os bots ocupam esse papel; no campo de testes eles continuam.
 
 import type { LevelData } from '../level/LevelData';
 import { TARGET } from './config';
-import type { EventQueue, HitPart } from './events';
+import type { EntityId, EventQueue, HitPart } from './events';
+import type { HitRegistry } from './HitRegistry';
 import { quatFromEuler } from './math';
 import { PhysicsWorld, RAPIER } from './PhysicsWorld';
 
@@ -18,18 +19,13 @@ export interface TargetState {
   downAt: number;
 }
 
-interface Hitbox {
-  targetId: number;
-  part: HitPart;
-}
+export const targetEntityId = (i: number): EntityId => `target:${i}`;
 
 export class TargetSystem {
   readonly targets: TargetState[] = [];
   private readonly colliders = new Map<number, RAPIER.Collider[]>();
-  /** handle do collider → alvo e parte atingida. */
-  private readonly hitboxes = new Map<number, Hitbox>();
 
-  constructor(physics: PhysicsWorld, level: LevelData, private readonly events: EventQueue) {
+  constructor(physics: PhysicsWorld, level: LevelData, hits: HitRegistry, private readonly events: EventQueue) {
     const world = physics.world;
     level.targets.forEach((spawn, id) => {
       const [x, z] = spawn.position;
@@ -47,20 +43,15 @@ export class TargetSystem {
           .setRotation(rot),
       );
 
-      this.hitboxes.set(bodyCol.handle, { targetId: id, part: 'body' });
-      this.hitboxes.set(headCol.handle, { targetId: id, part: 'head' });
+      hits.register(bodyCol, targetEntityId(id), () => 'body');
+      hits.register(headCol, targetEntityId(id), () => 'head');
       this.colliders.set(id, [bodyCol, headCol]);
       this.targets.push({ id, x, z, yaw: spawn.yaw, health: TARGET.health, down: false, downAt: 0 });
     });
   }
 
-  /** Retorna a hitbox de um collider, ou undefined se não for de um alvo. */
-  hitboxOf(collider: RAPIER.Collider): Hitbox | undefined {
-    return this.hitboxes.get(collider.handle);
-  }
-
-  applyDamage(hit: Hitbox, damage: number, time: number): void {
-    const t = this.targets[hit.targetId];
+  applyDamage(index: number, part: HitPart, damage: number, attacker: EntityId, time: number): void {
+    const t = this.targets[index];
     if (!t || t.down) return;
     t.health -= damage;
     const killed = t.health <= 0;
@@ -71,7 +62,7 @@ export class TargetSystem {
       // Alvo caído não bloqueia tiros nem movimento
       for (const c of this.colliders.get(t.id) ?? []) c.setEnabled(false);
     }
-    this.events.push({ type: 'hit', targetId: t.id, part: hit.part, damage, killed });
+    this.events.push({ type: 'hit', attacker, victim: targetEntityId(t.id), part, damage, killed });
   }
 
   update(time: number): void {
@@ -80,7 +71,7 @@ export class TargetSystem {
         t.down = false;
         t.health = TARGET.health;
         for (const c of this.colliders.get(t.id) ?? []) c.setEnabled(true);
-        this.events.push({ type: 'targetRespawn', targetId: t.id });
+        this.events.push({ type: 'respawn', id: targetEntityId(t.id) });
       }
     }
   }

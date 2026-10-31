@@ -2,7 +2,7 @@
 
 FPS tático 3D original para navegador, com foco em celular (touch, horizontal) e suporte a PC (teclado e mouse).
 
-**Estado atual:** Fase 3 — blockout do mapa **Galpão** (72 × 64 m, dois bombsites, três rotas de ataque), com movimento, fuzil hitscan e alvos no lugar dos defensores. O campo de testes antigo abre com `?mapa=teste`.
+**Estado atual:** Fase 4 — você (ataque) contra 3 bots da defesa no mapa **Galpão** (72 × 64 m, dois bombsites, três rotas). Os bots navegam até seus postos, vigiam, reagem, perseguem, ouvem tiros e pedem apoio. O campo de testes com alvos abre com `?mapa=teste`.
 
 **Modo de jogo (alvo):** como o Counter-Strike — o ataque planta a bomba em A ou B; a defesa impede ou desarma.
 
@@ -46,8 +46,11 @@ Ctrl não é usado para agachar porque Ctrl+W fecha a aba.
 src/
   core/      Game (orquestra), FixedStepLoop (tick fixo de 60 Hz), Settings
   input/     InputIntents (contrato), teclado/mouse, touch, InputManager
-  sim/       GameSim, PlayerController, WeaponController, TargetSystem,
-             PhysicsWorld, weapons (dados), events, rng  ← sem Babylon, sem DOM
+  sim/       GameSim, Combatant, PlayerController, WeaponController, HitRegistry,
+             TargetSystem, PhysicsWorld, weapons (dados), events, rng
+    ai/      BotBrain: estados posto → vigia → perseguição → combate
+    nav/     NavGrid: grade de 0,5 m gerada do nível, A* + suavização
+             ← sim/ inteiro: sem Babylon, sem DOM
   render/    GameRenderer, ViewModel, TargetViews, ImpactDecals: só leem o estado
   audio/     SoundFx: sons sintetizados provisórios (Web Audio)
   level/     Níveis como dados. galpao.ts descreve as áreas caminháveis e os
@@ -63,7 +66,8 @@ Regras que sustentam a evolução para multiplayer:
 3. **Tick fixo (60 Hz) e determinístico.** O render interpola entre ticks. Há teste garantindo que os mesmos intents produzem o mesmo resultado.
 4. **A simulação emite eventos** (`shot`, `hit`, `impact`…). Render, áudio e HUD reagem a eles; a simulação não sabe que existem.
 5. **Aleatoriedade com semente** (`Rng`). A dispersão dos tiros é reproduzível, condição para o servidor validar tiros no online.
-6. **Nível é dado.** A física e o render leem o mesmo `LevelData`, então o que se vê é o que colide.
+6. **Bot = jogador com outro cérebro.** Mesmo controlador, mesma arma, mesmas regras; o `BotBrain` só gera intents. No online, um bot é indistinguível de um cliente.
+7. **Nível é dado.** A física e o render leem o mesmo `LevelData`, então o que se vê é o que colide.
 
 ## Orçamento de performance (alvo)
 
@@ -78,7 +82,7 @@ Regras que sustentam a evolução para multiplayer:
 1. ✅ Sensibilidade configurável e volume (salvos no aparelho)
 2. ✅ Arma hitscan, cadência, dano por parte do corpo, dispersão, recuo, recarga, alvos com respawn, sons provisórios
 3. ✅ Blockout do mapa Galpão: rotas validadas por teste (A ~11 s, B ~9,5 s, estreita ~9 s, defesa ~4 s)
-4. Bots (navmesh com recast-navigation)
+4. ✅ Bots: navegação A* em grade, visão por raycast (sem atravessar paredes), reação de 0,6 s, erro de mira que assenta, rajadas, audição de tiros, um bot de apoio por avistamento, anti-travamento
 5. Rodadas, placar e bomba
 6. HUD final, menu e opções
 7. Arte final (low-poly semi-realista, GLB + KTX2, lightmaps)
