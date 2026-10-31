@@ -222,8 +222,7 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 .btn-fire { width: 92px; height: 92px; font-size: 13px; border-color: rgba(255, 122, 47, 0.8); background: rgba(255, 122, 47, 0.28); }
 .btn-fire.on { background: rgba(255, 122, 47, 0.7); }
 /* Atirar embaixo, ao lado do Pular: posição natural do polegar */
-.btn-fire-r { right: calc(108px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); }
-.btn-fire-l { left: calc(28px + var(--safe-l)); bottom: calc(200px + var(--safe-b)); width: 77px; height: 77px; }
+.btn-fire { right: calc(108px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); }
 .btn-reload { right: calc(126px + var(--safe-r)); bottom: calc(126px + var(--safe-b)); width: 56px; height: 56px; font-size: 10px; }
 .btn-jump { right: calc(30px + var(--safe-r)); bottom: calc(22px + var(--safe-b)); width: 64px; height: 64px; }
 .btn-crouch { right: calc(32px + var(--safe-r)); bottom: calc(106px + var(--safe-b)); width: 60px; height: 60px; }
@@ -231,7 +230,6 @@ body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: 
 
 /* Telas baixas (celular na horizontal com barra do navegador) */
 @media (max-height: 360px) {
-  .btn-fire-l { bottom: calc(170px + var(--safe-b)); }
   .btn-reload { bottom: calc(118px + var(--safe-b)); }
 }
 

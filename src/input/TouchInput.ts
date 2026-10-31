@@ -40,13 +40,12 @@ export class TouchInput implements InputSource {
     this.joyBase.append(this.joyKnob);
     moveZone.append(this.joyBase);
 
-    const fireRight = button('touch-btn btn-fire btn-fire-r', 'Atirar');
-    const fireLeft = button('touch-btn btn-fire btn-fire-l', 'Atirar');
+    const fireBtn = button('touch-btn btn-fire', 'Atirar');
     const reloadBtn = button('touch-btn btn-reload', 'Recarregar');
     const jumpBtn = button('touch-btn btn-jump', 'Pular');
     const crouchBtn = button('touch-btn btn-crouch', 'Agachar');
 
-    this.root.append(moveZone, lookZone, fireLeft, fireRight, reloadBtn, jumpBtn, crouchBtn);
+    this.root.append(moveZone, lookZone, fireBtn, reloadBtn, jumpBtn, crouchBtn);
     parent.append(this.root);
 
     // ---- Joystick flutuante: nasce onde o polegar toca
@@ -82,12 +81,10 @@ export class TouchInput implements InputSource {
     // ---- Mira por arraste
     this.bindLook(lookZone, opts);
 
-    // ---- Tiro. O botão direito também mira enquanto está pressionado:
+    // ---- Tiro. O botão também mira enquanto está pressionado:
     // o jogador corrige a mira sem tirar o polegar do gatilho.
-    for (const [btn, aims] of [
-      [fireRight, true],
-      [fireLeft, false],
-    ] as const) {
+    {
+      const btn = fireBtn;
       btn.addEventListener(
         'pointerdown',
         (e) => {
@@ -96,11 +93,11 @@ export class TouchInput implements InputSource {
           this.firePointers.add(e.pointerId);
           this.pressed.fire = true;
           btn.classList.add('on');
-          if (aims) this.lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          this.lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         },
         opts,
       );
-      if (aims) btn.addEventListener('pointermove', (e) => this.moveLook(e), opts);
+      btn.addEventListener('pointermove', (e) => this.moveLook(e), opts);
       const end = (e: PointerEvent) => {
         this.firePointers.delete(e.pointerId);
         this.lookPointers.delete(e.pointerId);

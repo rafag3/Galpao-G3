@@ -34,7 +34,7 @@ export class StartOverlay {
         </div>
         <p class="hint">${
           opts.isTouch
-            ? 'Polegar esquerdo move (no limite corre). Arraste à direita para mirar. O botão Atirar da direita também mira enquanto pressionado.'
+            ? 'Polegar esquerdo move (no limite corre). Arraste à direita para mirar. O botão Atirar também mira enquanto pressionado.'
             : 'WASD move · Shift corre · Espaço pula · C agacha · Clique atira · R recarrega · Esc pausa'
         }</p>
       </div>`;
