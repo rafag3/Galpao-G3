@@ -10,11 +10,14 @@ import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { Quaternion, Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { CreateBox } from '@babylonjs/core/Meshes/Builders/boxBuilder';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
-import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
 
 import type { BlockKind, LevelData } from '../level/LevelData';
 import { quatFromEuler, type Vec3 } from '../sim/math';
+import type { TargetState } from '../sim/TargetSystem';
+import { ImpactDecals } from './ImpactDecals';
+import { TargetViews } from './TargetViews';
+import { ViewModel } from './ViewModel';
 
 const PALETTE: Record<BlockKind, { main: string; line: string }> = {
   floor: { main: '#6b6f73', line: '#8a8f94' },
@@ -23,7 +26,6 @@ const PALETTE: Record<BlockKind, { main: string; line: string }> = {
   crate: { main: '#8a7a62', line: '#a8977c' },
   container: { main: '#4f6a80', line: '#6b8aa3' },
   ramp: { main: '#757a6e', line: '#949a8b' },
-  target: { main: '#b5652e', line: '#d9894f' },
 };
 
 /** Limite de resolução interna: telas de celular têm DPR 3, o que custa caro. */
@@ -33,21 +35,23 @@ export class GameRenderer {
   readonly engine: Engine;
   readonly scene: Scene;
   readonly camera: FreeCamera;
+  readonly viewModel: ViewModel;
+  readonly targets: TargetViews;
+  readonly impacts: ImpactDecals;
 
-  constructor(canvas: HTMLCanvasElement, level: LevelData) {
-    this.engine = new Engine(canvas, true, {
-      preserveDrawingBuffer: false,
-      stencil: false,
-      powerPreference: 'high-performance',
-      antialias: true,
-    }, false);
+  constructor(canvas: HTMLCanvasElement, level: LevelData, targets: readonly TargetState[]) {
+    this.engine = new Engine(
+      canvas,
+      true,
+      { preserveDrawingBuffer: false, stencil: false, powerPreference: 'high-performance', antialias: true },
+      false,
+    );
     this.applyPixelRatio();
 
     const scene = (this.scene = new Scene(this.engine));
     scene.clearColor = Color4.FromHexString('#a9b4bfff');
     scene.ambientColor = new Color3(0.3, 0.3, 0.3);
     scene.skipPointerMovePicking = true; // não usamos picking do Babylon
-    scene.autoClear = true;
     scene.fogMode = Scene.FOGMODE_LINEAR;
     scene.fogColor = new Color3(0.66, 0.7, 0.75);
     scene.fogStart = 25;
@@ -66,11 +70,14 @@ export class GameRenderer {
     sun.intensity = 0.55;
 
     this.buildLevel(level);
-    this.buildViewModel();
+    this.targets = new TargetViews(scene, targets);
+    this.impacts = new ImpactDecals(scene);
+    this.viewModel = new ViewModel(scene, this.camera);
+    scene.setRenderingAutoClearDepthStencil(1, true);
   }
 
   private buildLevel(level: LevelData): void {
-    // Agrupa blocos por tipo e funde em uma malha por tipo: ~7 draw calls
+    // Agrupa blocos por tipo e funde em uma malha por tipo: ~6 draw calls
     // para o cenário inteiro, em vez de um por bloco.
     const byKind = new Map<BlockKind, Mesh[]>();
     for (const [i, b] of level.blocks.entries()) {
@@ -105,30 +112,8 @@ export class GameRenderer {
     m.majorUnitFrequency = 4;
     m.minorUnitVisibility = 0.35;
     m.opacity = 0.99;
-    m.backFaceCulling = true;
     m.freeze();
     return m;
-  }
-
-  private buildViewModel(): void {
-    // Placeholder da arma em primeira pessoa. Grupo de render 1: desenha
-    // por cima do cenário, então não atravessa paredes ao encostar.
-    const mat = new StandardMaterial('vm-mat', this.scene);
-    mat.diffuseColor = Color3.FromHexString('#2b2e33');
-    mat.specularColor = new Color3(0.15, 0.15, 0.15);
-
-    const body = CreateBox('vm-body', { width: 0.06, height: 0.08, depth: 0.32 }, this.scene);
-    const grip = CreateBox('vm-grip', { width: 0.05, height: 0.12, depth: 0.06 }, this.scene);
-    grip.position.set(0, -0.08, -0.08);
-    grip.parent = body;
-    for (const m of [body, grip]) {
-      m.material = mat;
-      m.renderingGroupId = 1;
-      m.isPickable = false;
-    }
-    body.parent = this.camera;
-    body.position.set(0.17, -0.16, 0.36);
-    this.scene.setRenderingAutoClearDepthStencil(1, true);
   }
 
   /** Atualiza câmera e desenha um frame. */
@@ -136,6 +121,12 @@ export class GameRenderer {
     this.camera.position.set(eye.x, eye.y, eye.z);
     this.camera.rotation.set(pitch, yaw, 0);
     this.scene.render();
+  }
+
+  /** Pixels de tela por radiano no centro da tela (para a mira dinâmica). */
+  pixelsPerRadian(): number {
+    const h = this.engine.getRenderHeight(true) * this.engine.getHardwareScalingLevel();
+    return h / 2 / Math.tan(this.camera.fov / 2);
   }
 
   applyPixelRatio(): void {

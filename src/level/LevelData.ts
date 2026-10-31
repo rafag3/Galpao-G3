@@ -3,7 +3,7 @@
 
 import type { Vec3 } from '../sim/math';
 
-export type BlockKind = 'floor' | 'wall' | 'crate' | 'container' | 'ramp' | 'ceiling' | 'target';
+export type BlockKind = 'floor' | 'wall' | 'crate' | 'container' | 'ramp' | 'ceiling';
 
 export interface Block {
   kind: BlockKind;
@@ -15,9 +15,18 @@ export interface Block {
   rotation?: [number, number, number];
 }
 
+/** Alvo de treino com silhueta humana (corpo + cabeça). */
+export interface TargetSpawn {
+  /** Posição dos pés (x, z); fica sempre no chão em y = 0. */
+  position: [number, number];
+  /** Direção para onde o alvo olha (radianos; 0 = +Z). */
+  yaw: number;
+}
+
 export interface LevelData {
   name: string;
   blocks: Block[];
+  targets: TargetSpawn[];
   spawn: Vec3;
   /** Yaw inicial do jogador, em radianos. */
   spawnYaw: number;

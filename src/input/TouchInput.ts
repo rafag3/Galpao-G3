@@ -1,10 +1,11 @@
 // Controles touch: joystick flutuante à esquerda, área de mira à direita e
-// botões de ação. Usa Pointer Events para suportar multitoque (mover e mirar
+// botões de ação. Usa Pointer Events para multitoque (mover, mirar e atirar
 // ao mesmo tempo) e também mouse, o que facilita testar no PC.
 
-import type { InputSource, MoveIntent } from './InputIntents';
+import { settings } from '../core/Settings';
+import { noPressed, type InputSource, type MoveIntent, type PressedActions } from './InputIntents';
 
-const LOOK_SENS = 0.0055; // rad por pixel de arraste
+const LOOK_SENS = 0.0055; // rad por pixel de arraste, multiplicado pela preferência
 const JOY_RADIUS = 60; // px
 const RUN_THRESHOLD = 0.92; // joystick quase no limite = correr
 
@@ -18,14 +19,15 @@ export class TouchInput implements InputSource {
   private readonly joyBase: HTMLDivElement;
   private readonly joyKnob: HTMLDivElement;
 
-  private lookId: number | null = null;
-  private lookLast = { x: 0, y: 0 };
+  /** Dedos que estão girando a câmera → última posição. */
+  private readonly lookPointers = new Map<number, { x: number; y: number }>();
   private yaw = 0;
   private pitch = 0;
 
-  private jumpQueued = false;
+  /** Dedos segurando algum botão de tiro. */
+  private readonly firePointers = new Set<number>();
+  private pressed: PressedActions = noPressed();
   private crouchToggled = false;
-  private readonly crouchBtn: HTMLButtonElement;
 
   constructor(parent: HTMLElement) {
     const opts = { signal: this.abort.signal };
@@ -38,13 +40,16 @@ export class TouchInput implements InputSource {
     this.joyBase.append(this.joyKnob);
     moveZone.append(this.joyBase);
 
+    const fireRight = button('touch-btn btn-fire btn-fire-r', 'Atirar');
+    const fireLeft = button('touch-btn btn-fire btn-fire-l', 'Atirar');
+    const reloadBtn = button('touch-btn btn-reload', 'Recarregar');
     const jumpBtn = button('touch-btn btn-jump', 'Pular');
-    this.crouchBtn = button('touch-btn btn-crouch', 'Agachar');
+    const crouchBtn = button('touch-btn btn-crouch', 'Agachar');
 
-    this.root.append(moveZone, lookZone, jumpBtn, this.crouchBtn);
+    this.root.append(moveZone, lookZone, fireLeft, fireRight, reloadBtn, jumpBtn, crouchBtn);
     parent.append(this.root);
 
-    // Joystick flutuante: nasce onde o polegar toca
+    // ---- Joystick flutuante: nasce onde o polegar toca
     moveZone.addEventListener(
       'pointerdown',
       (e) => {
@@ -61,9 +66,7 @@ export class TouchInput implements InputSource {
     );
     moveZone.addEventListener(
       'pointermove',
-      (e) => {
-        if (e.pointerId === this.joyId) this.updateJoy(e.clientX, e.clientY);
-      },
+      (e) => e.pointerId === this.joyId && this.updateJoy(e.clientX, e.clientY),
       opts,
     );
     const endJoy = (e: PointerEvent) => {
@@ -76,54 +79,75 @@ export class TouchInput implements InputSource {
     moveZone.addEventListener('pointerup', endJoy, opts);
     moveZone.addEventListener('pointercancel', endJoy, opts);
 
-    // Mira: arraste relativo
-    lookZone.addEventListener(
-      'pointerdown',
-      (e) => {
-        if (this.lookId !== null) return;
-        this.lookId = e.pointerId;
-        lookZone.setPointerCapture(e.pointerId);
-        this.lookLast = { x: e.clientX, y: e.clientY };
-      },
-      opts,
-    );
-    lookZone.addEventListener(
-      'pointermove',
-      (e) => {
-        if (e.pointerId !== this.lookId) return;
-        this.yaw += (e.clientX - this.lookLast.x) * LOOK_SENS;
-        this.pitch += (e.clientY - this.lookLast.y) * LOOK_SENS;
-        this.lookLast = { x: e.clientX, y: e.clientY };
-      },
-      opts,
-    );
-    const endLook = (e: PointerEvent) => {
-      if (e.pointerId === this.lookId) this.lookId = null;
-    };
-    lookZone.addEventListener('pointerup', endLook, opts);
-    lookZone.addEventListener('pointercancel', endLook, opts);
+    // ---- Mira por arraste
+    this.bindLook(lookZone, opts);
 
-    jumpBtn.addEventListener(
-      'pointerdown',
-      (e) => {
-        e.preventDefault();
-        this.jumpQueued = true;
-      },
-      opts,
-    );
-    // Agachar é alternância no touch: segurar um botão ocupa o polegar da mira
-    this.crouchBtn.addEventListener(
-      'pointerdown',
-      (e) => {
-        e.preventDefault();
+    // ---- Tiro. O botão direito também mira enquanto está pressionado:
+    // o jogador corrige a mira sem tirar o polegar do gatilho.
+    for (const [btn, aims] of [
+      [fireRight, true],
+      [fireLeft, false],
+    ] as const) {
+      btn.addEventListener(
+        'pointerdown',
+        (e) => {
+          e.preventDefault();
+          btn.setPointerCapture(e.pointerId);
+          this.firePointers.add(e.pointerId);
+          this.pressed.fire = true;
+          btn.classList.add('on');
+          if (aims) this.lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        },
+        opts,
+      );
+      if (aims) btn.addEventListener('pointermove', (e) => this.moveLook(e), opts);
+      const end = (e: PointerEvent) => {
+        this.firePointers.delete(e.pointerId);
+        this.lookPointers.delete(e.pointerId);
+        btn.classList.remove('on');
+      };
+      btn.addEventListener('pointerup', end, opts);
+      btn.addEventListener('pointercancel', end, opts);
+    }
+
+    tapButton(reloadBtn, () => (this.pressed.reload = true), opts);
+    tapButton(jumpBtn, () => (this.pressed.jump = true), opts);
+    // Agachar alterna: segurar um botão ocuparia o polegar da mira
+    tapButton(
+      crouchBtn,
+      () => {
         this.crouchToggled = !this.crouchToggled;
-        this.crouchBtn.classList.toggle('on', this.crouchToggled);
+        crouchBtn.classList.toggle('on', this.crouchToggled);
       },
       opts,
     );
 
-    // Impede menu de contexto/seleção em toque longo
+    // Impede menu de contexto e seleção em toque longo
     this.root.addEventListener('contextmenu', (e) => e.preventDefault(), opts);
+  }
+
+  private bindLook(zone: HTMLElement, opts: AddEventListenerOptions) {
+    zone.addEventListener(
+      'pointerdown',
+      (e) => {
+        zone.setPointerCapture(e.pointerId);
+        this.lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      },
+      opts,
+    );
+    zone.addEventListener('pointermove', (e) => this.moveLook(e), opts);
+    const end = (e: PointerEvent) => this.lookPointers.delete(e.pointerId);
+    zone.addEventListener('pointerup', end, opts);
+    zone.addEventListener('pointercancel', end, opts);
+  }
+
+  private moveLook(e: PointerEvent) {
+    const last = this.lookPointers.get(e.pointerId);
+    if (!last) return;
+    const k = LOOK_SENS * settings.touchSensitivity;
+    this.yaw += (e.clientX - last.x) * k;
+    this.pitch += (e.clientY - last.y) * k;
+    this.lookPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
 
   private updateJoy(x: number, y: number) {
@@ -143,6 +167,7 @@ export class TouchInput implements InputSource {
     into.moveZ += -this.joyVec.y; // tela: y para baixo; jogo: frente = +Z
     into.run ||= Math.hypot(this.joyVec.x, this.joyVec.y) >= RUN_THRESHOLD;
     into.crouch ||= this.crouchToggled;
+    into.fire ||= this.firePointers.size > 0;
   }
 
   consumeLook() {
@@ -152,10 +177,10 @@ export class TouchInput implements InputSource {
     return out;
   }
 
-  consumeJump(): boolean {
-    const j = this.jumpQueued;
-    this.jumpQueued = false;
-    return j;
+  consumePressed(): PressedActions {
+    const p = this.pressed;
+    this.pressed = noPressed();
+    return p;
   }
 
   dispose(): void {
@@ -177,4 +202,15 @@ function button(className: string, label: string): HTMLButtonElement {
   b.textContent = label;
   b.setAttribute('aria-label', label);
   return b;
+}
+
+function tapButton(btn: HTMLButtonElement, onTap: () => void, opts: AddEventListenerOptions) {
+  btn.addEventListener(
+    'pointerdown',
+    (e) => {
+      e.preventDefault();
+      onTap();
+    },
+    opts,
+  );
 }

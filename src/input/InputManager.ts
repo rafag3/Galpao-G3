@@ -5,6 +5,8 @@ import { emptyIntent, type InputSource, type MoveIntent } from './InputIntents';
 export class InputManager {
   private readonly sources: InputSource[] = [];
   private jumpLatched = false;
+  private reloadLatched = false;
+  private fireLatched = false;
 
   add(source: InputSource): void {
     this.sources.push(source);
@@ -23,21 +25,34 @@ export class InputManager {
   }
 
   /**
-   * Coleta o pulo a cada frame e o mantém até um tick consumi-lo. Sem isso,
-   * um toque rápido entre dois ticks poderia se perder.
+   * Coleta as ações de toque único a cada frame e as mantém até um tick
+   * consumi-las. Sem isso, um toque rápido entre dois ticks se perderia.
    */
   pollFrame(): void {
-    for (const s of this.sources) if (s.consumeJump()) this.jumpLatched = true;
+    for (const s of this.sources) {
+      const p = s.consumePressed();
+      this.jumpLatched ||= p.jump;
+      this.reloadLatched ||= p.reload;
+      this.fireLatched ||= p.fire;
+    }
   }
 
-  /** Intent para UM tick de simulação. */
-  sampleTick(): MoveIntent {
-    const intent = emptyIntent();
+  /** Descarta ações pendentes (ao pausar, por exemplo). */
+  clearLatched(): void {
+    this.jumpLatched = this.reloadLatched = this.fireLatched = false;
+  }
+
+  /** Intent para UM tick de simulação, com a visão atual do jogador. */
+  sampleTick(yaw: number, pitch: number): MoveIntent {
+    const intent = emptyIntent(yaw, pitch);
     for (const s of this.sources) s.sample(intent);
     intent.moveX = Math.max(-1, Math.min(1, intent.moveX));
     intent.moveZ = Math.max(-1, Math.min(1, intent.moveZ));
     intent.jump = this.jumpLatched;
-    this.jumpLatched = false;
+    intent.reload = this.reloadLatched;
+    // Toque mais curto que um tick ainda dispara
+    intent.fire ||= this.fireLatched;
+    this.clearLatched();
     return intent;
   }
 

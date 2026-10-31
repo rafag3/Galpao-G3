@@ -42,16 +42,19 @@ const blocks: Block[] = [
   { kind: 'wall', position: [0, 0.7, -12], size: [0.4, 1.4, 4] },
   { kind: 'wall', position: [2.2, 0.7, -12], size: [0.4, 1.4, 4] },
   { kind: 'ceiling', position: [1.1, 1.6, -12], size: [2.8, 0.4, 4] },
-
-  // Alvos (usados a partir da Fase 2)
-  { kind: 'target', position: [-6, 1.2, 17], size: [0.6, 2.4, 0.2] },
-  { kind: 'target', position: [0, 1.2, 17], size: [0.6, 2.4, 0.2] },
-  { kind: 'target', position: [6, 1.2, 17], size: [0.6, 2.4, 0.2] },
 ];
 
 export const testRange: LevelData = {
   name: 'Campo de testes',
   blocks,
+  // Alvos olhando para o spawn (yaw = π → olham para -Z), em distâncias variadas
+  targets: [
+    { position: [-6, 17], yaw: Math.PI },
+    { position: [0, 17], yaw: Math.PI },
+    { position: [6, 17], yaw: Math.PI },
+    { position: [-3.4, 8.5], yaw: Math.PI }, // atrás das caixas
+    { position: [8, 15.5], yaw: Math.PI }, // atrás do contêiner
+  ],
   spawn: { x: 0, y: 1, z: 0 },
   spawnYaw: 0,
 };

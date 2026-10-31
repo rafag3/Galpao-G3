@@ -40,20 +40,87 @@ html, body {
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui > * { pointer-events: auto; }
 
-/* Mira */
-#ui::after {
-  content: '';
+/* Mira dinâmica: abre com a dispersão real da arma */
+.crosshair {
+  --gap: 4px;
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 4px;
-  height: 4px;
-  margin: -2px 0 0 -2px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
+  width: 0;
+  height: 0;
+  pointer-events: none !important;
+  z-index: 3;
 }
+.ch {
+  position: absolute;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+.ch-t, .ch-b { width: 2px; height: 7px; left: -1px; }
+.ch-l, .ch-r { width: 7px; height: 2px; top: -1px; }
+.ch-t { bottom: var(--gap); }
+.ch-b { top: var(--gap); }
+.ch-l { right: var(--gap); }
+.ch-r { left: var(--gap); }
+
+/* Marcador de acerto */
+.hitmarker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  opacity: 0;
+  pointer-events: none !important;
+  z-index: 3;
+}
+.hitmarker::before, .hitmarker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  margin-left: -1px;
+  background: linear-gradient(#fff 0 35%, transparent 35% 65%, #fff 65%);
+  transform: rotate(45deg);
+}
+.hitmarker::after { transform: rotate(-45deg); }
+.hitmarker.show { opacity: 1; }
+.hitmarker.head::before, .hitmarker.head::after { background: linear-gradient(var(--orange) 0 35%, transparent 35% 65%, var(--orange) 65%); }
+.hitmarker.kill { transform: scale(1.35); }
+.hitmarker.kill::before, .hitmarker.kill::after { background: linear-gradient(#ff3b3b 0 35%, transparent 35% 65%, #ff3b3b 65%); }
+
+/* Munição */
+.hud-ammo {
+  position: absolute;
+  right: calc(24px + var(--safe-r));
+  bottom: calc(20px + var(--safe-b));
+  padding: 6px 12px 8px;
+  border-radius: 8px;
+  background: var(--panel);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none !important;
+  overflow: hidden;
+  z-index: 5;
+}
+.ammo-mag { font-size: 26px; }
+.ammo-reserve { font-size: 15px; color: var(--muted); }
+.hud-ammo.low .ammo-mag { color: var(--orange); }
+.reload-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--blue);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.hud-ammo:not(.reloading) .reload-bar { display: none; }
+body.is-touch .hud-ammo { right: calc(30px + var(--safe-r)); bottom: auto; top: calc(10px + var(--safe-t)); }
 
 /* Overlays */
 .overlay {
@@ -81,6 +148,10 @@ html, body {
   cursor: pointer;
 }
 .start-card .hint { color: var(--muted); font-size: 14px; margin-top: 18px; line-height: 1.5; }
+.settings { display: grid; gap: 10px; margin: 20px auto 0; max-width: 340px; text-align: left; font-size: 14px; }
+.settings label { display: grid; grid-template-columns: 1fr 52px; gap: 4px 10px; align-items: center; }
+.settings input { grid-column: 1; width: 100%; accent-color: var(--blue); min-height: 28px; }
+.settings output { grid-column: 2; grid-row: 2; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .overlay.fatal pre { color: var(--orange); white-space: pre-wrap; }
 
 /* Debug */
@@ -142,9 +213,22 @@ html, body {
   z-index: 6;
 }
 .touch-btn:active { background: rgba(61, 139, 255, 0.55); }
-.btn-jump { right: calc(24px + var(--safe-r)); bottom: calc(24px + var(--safe-b)); }
-.btn-crouch { right: calc(108px + var(--safe-r)); bottom: calc(18px + var(--safe-b)); width: 60px; height: 60px; }
+.touch-btn.on { background: rgba(61, 139, 255, 0.55); }
+.btn-fire { width: 84px; height: 84px; font-size: 13px; border-color: rgba(255, 122, 47, 0.8); background: rgba(255, 122, 47, 0.28); }
+.btn-fire.on { background: rgba(255, 122, 47, 0.7); }
+.btn-fire-r { right: calc(30px + var(--safe-r)); bottom: calc(112px + var(--safe-b)); }
+.btn-fire-l { left: calc(28px + var(--safe-l)); bottom: calc(200px + var(--safe-b)); width: 70px; height: 70px; }
+.btn-reload { right: calc(130px + var(--safe-r)); bottom: calc(128px + var(--safe-b)); width: 56px; height: 56px; font-size: 10px; }
+.btn-jump { right: calc(30px + var(--safe-r)); bottom: calc(22px + var(--safe-b)); width: 64px; height: 64px; }
+.btn-crouch { right: calc(112px + var(--safe-r)); bottom: calc(18px + var(--safe-b)); width: 60px; height: 60px; }
 .btn-crouch.on { background: rgba(255, 122, 47, 0.6); border-color: var(--orange); }
+
+/* Telas baixas (celular na horizontal com barra do navegador) */
+@media (max-height: 360px) {
+  .btn-fire-l { bottom: calc(170px + var(--safe-b)); }
+  .btn-fire-r { bottom: calc(96px + var(--safe-b)); }
+  .btn-reload { bottom: calc(110px + var(--safe-b)); }
+}
 
 /* Aviso de orientação (só touch, em retrato) */
 .rotate-hint { display: none; }
@@ -160,4 +244,15 @@ html, body {
     padding: 24px;
     text-align: center;
   }
+}
+
+/* Tela inicial cabe em celular deitado (≈390 px de altura) */
+.overlay { overflow-y: auto; }
+@media (max-height: 430px) {
+  .start-card { padding: 12px; }
+  .start-card h1 { font-size: 28px; }
+  .start-card .phase { margin: 2px 0 10px; }
+  .start-btn { min-height: 44px; padding: 10px 40px; }
+  .settings { margin-top: 12px; gap: 4px; }
+  .start-card .hint { margin-top: 10px; font-size: 12px; }
 }

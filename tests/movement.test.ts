@@ -13,9 +13,15 @@ beforeAll(async () => {
   await initPhysics();
 });
 
+/** Intent que mantém a visão atual do jogador. */
+function intentFor(sim: GameSim, partial: Partial<MoveIntent> = {}): MoveIntent {
+  const s = sim.player.state;
+  return { ...emptyIntent(s.yaw, s.pitch), ...partial };
+}
+
 function run(sim: GameSim, seconds: number, intent: Partial<MoveIntent> = {}) {
   const ticks = Math.round(seconds * SIM_HZ);
-  for (let i = 0; i < ticks; i++) sim.tick({ ...emptyIntent(), ...intent });
+  for (let i = 0; i < ticks; i++) sim.tick(intentFor(sim, intent));
 }
 
 function levelWithSpawn(x: number, z: number, yaw = 0): LevelData {
@@ -60,10 +66,10 @@ describe('movimento do jogador', () => {
   it('pula ~0,9 m e volta ao chão', () => {
     const sim = new GameSim(levelWithSpawn(0, 0));
     run(sim, 1);
-    sim.tick({ ...emptyIntent(), jump: true });
+    sim.tick(intentFor(sim, { jump: true }));
     let peak = 0;
     for (let i = 0; i < SIM_HZ * 1.5; i++) {
-      sim.tick(emptyIntent());
+      sim.tick(intentFor(sim));
       peak = Math.max(peak, sim.player.state.feet.y);
     }
     expect(peak).toBeGreaterThan(0.7);
@@ -83,7 +89,7 @@ describe('movimento do jogador', () => {
     run(sim, 1);
     let top = 0;
     for (let i = 0; i < SIM_HZ * 2.5; i++) {
-      sim.tick({ ...emptyIntent(), moveZ: 1 });
+      sim.tick(intentFor(sim, { moveZ: 1 }));
       top = Math.max(top, sim.player.state.feet.y);
     }
     expect(top).toBeGreaterThan(1.3); // topo da escada: 1,4 m
@@ -119,7 +125,7 @@ describe('movimento do jogador', () => {
     for (const sim of [a, b]) {
       run(sim, 1);
       run(sim, 0.7, { moveZ: 1, moveX: 0.4, run: true });
-      sim.tick({ ...emptyIntent(), jump: true });
+      sim.tick(intentFor(sim, { jump: true }));
       run(sim, 1, { moveX: -1 });
     }
     expect(a.player.state.feet).toEqual(b.player.state.feet);

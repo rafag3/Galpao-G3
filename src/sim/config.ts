@@ -30,3 +30,11 @@ export const BODY = {
 export const LOOK = {
   maxPitch: (89 * Math.PI) / 180,
 };
+
+/** Silhueta dos alvos (também usada pelo render, para bater com a hitbox). */
+export const TARGET = {
+  health: 100,
+  respawnSeconds: 3,
+  body: { width: 0.5, height: 1.5, depth: 0.3 }, // de y = 0 a 1,5 m
+  head: { size: 0.26, centerY: 1.66 },
+};

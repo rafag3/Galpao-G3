@@ -26,7 +26,7 @@ const halfHeightFor = (height: number) => height / 2 - BODY.radius;
 export class PlayerController {
   readonly state: PlayerState;
   private readonly body: RAPIER.RigidBody;
-  private readonly collider: RAPIER.Collider;
+  readonly collider: RAPIER.Collider;
   private readonly controller: RAPIER.KinematicCharacterController;
   private height: number = BODY.standHeight;
 
@@ -63,16 +63,12 @@ export class PlayerController {
     this.controller.setSlideEnabled(true);
   }
 
-  /** Aplica o giro de câmera. Chamado a cada frame para resposta imediata. */
-  applyLook(deltaYaw: number, deltaPitch: number): void {
-    const s = this.state;
-    s.yaw = (s.yaw + deltaYaw) % (Math.PI * 2);
-    s.pitch = clamp(s.pitch + deltaPitch, -LOOK.maxPitch, LOOK.maxPitch);
-  }
-
   /** Um tick de simulação com passo fixo. */
   step(intent: MoveIntent, dt: number): void {
     const s = this.state;
+    // A visão vem no intent (ângulos absolutos): o servidor recebe o mesmo.
+    s.yaw = intent.yaw;
+    s.pitch = clamp(intent.pitch, -LOOK.maxPitch, LOOK.maxPitch);
 
     this.updateCrouch(intent.crouch);
 

@@ -2,7 +2,7 @@
 
 FPS tático 3D original para navegador, com foco em celular (touch, horizontal) e suporte a PC (teclado e mouse).
 
-**Estado atual:** Fase 0 — teste de stack. Cena cinza de testes, movimento em primeira pessoa e controles touch + teclado/mouse.
+**Estado atual:** Fase 2 — combate. Cena cinza de testes com movimento em primeira pessoa, fuzil hitscan, alvos com hitbox de corpo e cabeça, e controles touch + teclado/mouse.
 
 ## Stack
 
@@ -33,6 +33,8 @@ npm run build    # typecheck + build de produção em dist/
 | Mirar | Mouse (clique para capturar, Esc solta) | Arrastar na metade direita |
 | Pular | Espaço | Botão **Pular** |
 | Agachar | C (segurar) | Botão **Agachar** (alterna) |
+| Atirar | Clique esquerdo (segurar = automático) | **Atirar** à direita (também mira enquanto pressionado) ou à esquerda |
+| Recarregar | R | Botão **Recarregar** (ou automático ao atirar sem bala) |
 
 Ctrl não é usado para agachar porque Ctrl+W fecha a aba.
 
@@ -40,10 +42,12 @@ Ctrl não é usado para agachar porque Ctrl+W fecha a aba.
 
 ```
 src/
-  core/      Game (orquestra), FixedStepLoop (tick fixo de 60 Hz)
+  core/      Game (orquestra), FixedStepLoop (tick fixo de 60 Hz), Settings
   input/     InputIntents (contrato), teclado/mouse, touch, InputManager
-  sim/       GameSim, PlayerController, PhysicsWorld, config, math  ← sem Babylon, sem DOM
-  render/    GameRenderer (Babylon): só lê o estado da simulação
+  sim/       GameSim, PlayerController, WeaponController, TargetSystem,
+             PhysicsWorld, weapons (dados), events, rng  ← sem Babylon, sem DOM
+  render/    GameRenderer, ViewModel, TargetViews, ImpactDecals: só leem o estado
+  audio/     SoundFx: sons sintetizados provisórios (Web Audio)
   level/     Níveis como dados, lidos pela física e pelo render
   ui/        Tela inicial, painel de diagnóstico
 tests/       Testes da simulação (Node)
@@ -54,20 +58,22 @@ Regras que sustentam a evolução para multiplayer:
 1. **`sim/` não importa Babylon nem DOM.** Os testes rodam em Node, o que garante isso na prática.
 2. **Input vira intenção (`MoveIntent`).** A simulação não sabe se o comando veio de touch, teclado ou rede. No online, o cliente envia intents e o servidor roda a mesma `GameSim`.
 3. **Tick fixo (60 Hz) e determinístico.** O render interpola entre ticks. Há teste garantindo que os mesmos intents produzem o mesmo resultado.
-4. **Nível é dado.** A física e o render leem o mesmo `LevelData`, então o que se vê é o que colide.
+4. **A simulação emite eventos** (`shot`, `hit`, `impact`…). Render, áudio e HUD reagem a eles; a simulação não sabe que existem.
+5. **Aleatoriedade com semente** (`Rng`). A dispersão dos tiros é reproduzível, condição para o servidor validar tiros no online.
+6. **Nível é dado.** A física e o render leem o mesmo `LevelData`, então o que se vê é o que colide.
 
 ## Orçamento de performance (alvo)
 
 - 60 FPS como meta e 30 como piso, num Android intermediário e num iPhone com Safari
-- Até ~100 mil triângulos visíveis e ~150 draw calls (cenário atual: 7)
+- Até ~100 mil triângulos visíveis e ~150 draw calls (cena atual: 15)
 - Resolução interna limitada a 1,5x o DPR
 - Download inicial até ~15 MB (atual: ~2 MB gzip)
 
 ## Fases
 
 0. ✅ Teste de stack: cena, controles touch e mouse, deploy
-1. Movimento refinado (sensibilidade configurável, inclinação, som de passos)
-2. Arma, tiro (raycast), dano, vida, recarga
+1. ✅ Sensibilidade configurável e volume (salvos no aparelho)
+2. ✅ Arma hitscan, cadência, dano por parte do corpo, dispersão, recuo, recarga, alvos com respawn, sons provisórios
 3. Blockout do mapa do galpão com bombsites
 4. Bots (navmesh com recast-navigation)
 5. Rodadas, placar e bomba
